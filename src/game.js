@@ -590,6 +590,7 @@ const SFX = {
   splat: () => noise(0.25, 0.15, 600),
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'square', 0.06, null, i * 0.15)),
   lose: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.35, 'triangle', 0.08, null, i * 0.18)),
+  alert: () => [880, 880, 1175].forEach((f, i) => tone(f, 0.14, 'square', 0.05, null, i * 0.13)),
 };
 function sfx(name, x, z) {
   let v = 1;
@@ -909,7 +910,7 @@ class Hero {
     this.barfUntil = 0; this.burst = 0; this.burstT = 0; this.burstYaw = 0; this.punchT = 0; this.recoil = 0;
     this.kbx = 0; this.kbz = 0; this.flashT = 0; this.flashOn = false; this.ghost = false; this.walk = 0;
     this.numAcc = 0; this.numT = 0; this.laserSfxT = 0;
-    this.mx = 0; this.mz = 0;
+    this.mx = 0; this.mz = 0; this.dance = null; this.danceT = 0;
     this.ai = isPlayer ? null : { target: null, think: 0, strafe: 1, strafeT: 0, wander: null, goal: null, react: 0, stuckT: 0, lx: 0, lz: 0 };
     if (key === 'brickster') this.shieldMesh = makeShield(this);
     if (key === 'barf') this.beam = makeBeam();
@@ -1212,7 +1213,7 @@ function useSuper(h, yaw) {
 }
 
 function damage(t, amt, src, o = {}) {
-  if (!t.alive || amt <= 0) return;
+  if (!t.alive || amt <= 0 || t.dance) return;
   if (t.shielded) {
     if (src && src.isPlayer && T - (t.blockT || 0) > 0.5) { t.blockT = T; floatNum(t, 'BLOCKED', '#9fd3ff'); }
     return;
@@ -1249,6 +1250,7 @@ function eliminate(h, killer, cause) {
   sfx('elim', h.x, h.z);
   if (!h.isPlayer) spawnPickup('health', h.x, h.z, true);
   if (killer && killer.isPlayer) popup(`💥 Nice one, ${playerName}!`);
+  leftBanner();
   checkEnd();
 }
 
@@ -1540,6 +1542,7 @@ function animateHero(h, dt, speed) {
   if (r.mouth) r.mouth.scale.y = (h.barfUntil > T) ? 1.8 : 1;
   if (r.scarf) r.scarf.rotation.x = Math.sin(T * 12 + h.x) * 0.15 + (moving ? 0.25 : 0);
   if (h.lasering) r.head.rotation.x = Math.sin(T * 40) * 0.03;
+  if (h.dance) danceHero(h, dt);
 
   h.root.position.set(h.x, h.y, h.z);
   h.root.rotation.y = h.yaw;
@@ -1562,6 +1565,51 @@ function animateHero(h, dt, speed) {
   } else {
     h.root.visible = !inv;
   }
+}
+
+// victory dance (specs/09-screens-and-audio.md)
+const DANCES = ['flap', 'spin', 'sway'];
+const CONFETTI = [0xffd23f, 0xff9f1a, 0xffffff, 0xff4d8d, 0x5ff6ff];
+function danceHero(h, dt) {
+  const r = h.rig, t = (h.danceT += dt), e = 1 - Math.exp(-12 * dt);
+  const base = r.float ? 0.45 : 0;
+  let armX = 0, armZ = 0, armXL = null, legX = 0, bodyY = base, spin = 0, tilt = 0;
+  if (h.dance === 'flap') {
+    armZ = 1.3 + Math.sin(t * 14) * 0.9;
+    bodyY = base + Math.abs(Math.sin(t * 7)) * 0.5;
+    legX = Math.sin(t * 7) * 0.3;
+  } else if (h.dance === 'spin') {
+    armZ = 1.5; spin = t * 9;
+    bodyY = base + Math.abs(Math.sin(t * 9)) * 0.15;
+  } else {
+    armX = -2.7 + Math.sin(t * 10) * 0.35; armXL = -2.7 - Math.sin(t * 10) * 0.35;
+    tilt = Math.sin(t * 5) * 0.25;
+    legX = Math.max(0, Math.sin(t * 5)) * -0.9;
+    bodyY = base + Math.abs(Math.sin(t * 10)) * 0.12;
+  }
+  r.armR.rotation.x = lerp(r.armR.rotation.x, armX, e);
+  r.armL.rotation.x = lerp(r.armL.rotation.x, armXL ?? armX, e);
+  r.armR.rotation.z = lerp(r.armR.rotation.z, armZ, e);
+  r.armL.rotation.z = lerp(r.armL.rotation.z, -armZ, e);
+  r.armL.rotation.y = 0;
+  r.legL.rotation.x = legX; r.legR.rotation.x = h.dance === 'sway' ? 0 : -legX;
+  r.body.position.y = bodyY;
+  r.body.rotation.y = spin;
+  r.body.rotation.z = tilt;
+  r.head.rotation.z = Math.sin(t * 6) * 0.15;
+  h.danceSpark = (h.danceSpark || 0) - dt;
+  if (h.danceSpark <= 0) {
+    h.danceSpark = 0.12;
+    const a = rand(0, TAU), d = rand(0.5, 3);
+    spawnP(h.x + Math.cos(a) * d, h.y + 5 * h.def.scale, h.z + Math.sin(a) * d, rand(-1, 1), rand(0, 2), rand(-1, 1), pick(CONFETTI), rand(0.15, 0.3), 2.2, 3);
+  }
+}
+function startDance(h) {
+  h.dance = pick(DANCES); h.danceT = 0;
+  h.mx = h.mz = 0; h.laserUntil = 0; h.barfUntil = 0; h.dashUntil = 0;
+  if (h.beam) h.beam.visible = false;
+  burst(h.x, h.y + 2.5 * h.def.scale, h.z, 60, CONFETTI, 12, 0.3, 1.6, 6);
+  $('hud').classList.add('dancing');
 }
 
 function updateDead(h, dt) {
@@ -1936,6 +1984,15 @@ function updateCamera(dt) {
     return;
   }
   const h = player, s = h.def.scale;
+  if (h.dance) {
+    // swing round to the front of the dancing hero and sway gently
+    const a = h.yaw + Math.sin(h.danceT * 0.5) * 0.5, d = 6.5 * s;
+    camTarget.set(h.x + Math.sin(a) * d, h.y + 2.6 * s, h.z + Math.cos(a) * d);
+    camera.position.lerp(camTarget, 1 - Math.exp(-4 * dt));
+    camera.lookAt(h.x, h.y + 0.9 * s, h.z);
+    aimRing.visible = false;
+    return;
+  }
   const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw), rx = -fz, rz = fx;
   const d = 7.5 * s, p = camPitch;
   camTarget.set(h.x - fx * d * Math.cos(p) + rx * 1.1, h.y + 2.4 * s + d * Math.sin(p) + 0.6, h.z - fz * d * Math.cos(p) + rz * 1.1);
@@ -1970,6 +2027,19 @@ function inkSplat() {
     html += `<div class="blob" style="left:${rand(-5, 85)}%;top:${rand(-5, 75)}%;width:${sz}px;height:${sz * rand(0.7, 1.1)}px"></div>`;
   }
   $('ink').innerHTML = html; inkT = 2; sfx('splat');
+}
+// "heroes left" banner (specs/08-controls-and-hud.md)
+const BANNER_AT = [5, 3, 2];
+let bannerShown = new Set();
+function leftBanner() {
+  if (state !== 'play' || !player || !player.alive) return;
+  const n = heroes.filter((e) => e.alive).length;
+  if (n < 2 || !BANNER_AT.some((t) => n <= t && !bannerShown.has(t))) return;
+  for (const t of BANNER_AT) if (n <= t) bannerShown.add(t);
+  const el = $('banner');
+  el.textContent = n === 2 ? '⚔️ FINAL 2!' : n === 3 ? '⚠️ 3 LEFT!' : `🔥 ${n} LEFT!`;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  SFX.alert();
 }
 function popup(text) { const el = $('popup'); el.textContent = text; el.style.opacity = 1; popupT = 1.4; }
 function feed(text) {
@@ -2145,6 +2215,7 @@ function clearMatch() {
   for (const o of holes) scene.remove(o.mesh);
   holes = [];
   inkT = 0; $('ink').style.opacity = 0;
+  bannerShown = new Set(); $('banner').classList.remove('show'); $('hud').classList.remove('dancing');
   for (const p of particles) { p.life = 0; p.m.visible = false; }
   for (const f of floats) f.el.remove();
   floats.length = 0;
@@ -2231,6 +2302,7 @@ function checkEnd() {
 }
 function endMatch(won, place) {
   state = 'ending'; mouseDown = false;
+  if (won) startDance(player);
   save.games++; save.elims += player.kills;
   if (won) save.wins++;
   storeSave();
@@ -2250,6 +2322,7 @@ function endMatch(won, place) {
     if (document.pointerLockElement) document.exitPointerLock();
     $('pause').classList.add('hidden');
     $('popup').style.opacity = 0; popupT = 0;
+    $('end').classList.toggle('win', won);
     $('endtitle').textContent = won ? '🏆 YOU WON!' : 'ELIMINATED';
     const k = player.kills;
     $('endsub').textContent = won
@@ -2258,7 +2331,7 @@ function endMatch(won, place) {
     $('end').classList.remove('hidden');
     renderCards();
     SFX[won ? 'win' : 'lose']();
-  }, won ? 1200 : 1800);
+  }, won ? 2500 : 1800);
 }
 
 async function postResult(place, elims, hero) {
@@ -2380,6 +2453,7 @@ function frame(now) {
     updateHUD(dt);
   } else if (state === 'paused' || state === 'end') {
     updateHUD(0);
+    if (state === 'end' && player && player.dance) { T += dt; animateHero(player, dt, 0); updateParticles(dt); }
   }
   updateCamera(dt);
   renderer.render(scene, camera);

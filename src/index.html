@@ -115,6 +115,18 @@
   #stormfx { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(155,77,255,0.7); opacity: 0; transition: opacity .3s; }
   #ink { position: absolute; inset: 0; opacity: 0; }
   #ink .blob { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(25,8,40,0.97) 55%, rgba(25,8,40,0) 72%); }
+  #banner { position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%) scale(0.4); opacity: 0;
+    font-size: clamp(44px, 8vw, 90px); font-weight: 900; color: var(--accent2); letter-spacing: 3px; white-space: nowrap;
+    text-shadow: 0 6px 0 #b33a00, 0 10px 24px rgba(0,0,0,0.7); }
+  #banner.show { animation: banner 2.2s ease-out forwards; }
+  @keyframes banner {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    12% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    20%, 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); } }
+  #hud.dancing #crosshair, #hud.dancing #bottom, #hud.dancing #effects, #hud.dancing #warn { display: none; }
+  #end.win { justify-content: flex-end; padding-bottom: 28px;
+    background: linear-gradient(rgba(20,5,0,0) 35%, rgba(20,5,0,0.85)); }
   #redflash { position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(255,0,0,0.0); transition: box-shadow .15s; }
 </style>
 </head>
@@ -130,6 +142,7 @@
   <canvas id="minimap" width="160" height="160"></canvas>
   <div id="warn"></div>
   <div id="popup"></div>
+  <div id="banner"></div>
   <div id="stormfx"></div>
   <div id="ink"></div>
   <div id="effects"></div>

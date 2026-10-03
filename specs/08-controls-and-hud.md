@@ -25,3 +25,13 @@
 - **Top right:** round minimap showing the island, volcano, lava, storm circles, and the player as an arrow (no enemies, like Fortnite)
 - **Over bots:** name and a small health bar (hidden while they're invisible)
 - **Damage numbers** pop up where hits land
+
+## "Heroes left" banner ✅
+A big banner flashes in the middle of the screen as the match closes in (the boys' request, 2026-10-03).
+- 🔧 Shown when **5**, **3** and **2** heroes are left:
+  - 5 → "🔥 5 LEFT!"
+  - 3 → "⚠️ 3 LEFT!"
+  - 2 → "⚔️ FINAL 2!"
+- 🔧 If several heroes go out at once, the banner shows the real number left (for example 6 → 4 shows "🔥 4 LEFT!")
+- 🔧 It pops in, stays about 2 sec, then fades, with a short alert sound
+- 🔧 Only shown while the player is still alive

@@ -17,7 +17,7 @@ A battle royale game for the browser, built by Jordan and the boys.
 | [05-map-lava-volcano.md](05-map-lava-volcano.md) | Map layout, lava, rocks, the volcano |
 | [06-storm.md](06-storm.md) | Shrinking storm phases and damage |
 | [07-bots.md](07-bots.md) | How the bots think and the difficulty levels |
-| [08-controls-and-hud.md](08-controls-and-hud.md) | Keys, camera, and on-screen info |
+| [08-controls-and-hud.md](08-controls-and-hud.md) | Keys, touch controls, camera, and on-screen info |
 | [09-screens-and-audio.md](09-screens-and-audio.md) | Menu, pause, and end screens, plus sounds |
 | [10-tech.md](10-tech.md) | Tech stack, files, build, and Chromebook notes |
 | [11-future-ideas.md](11-future-ideas.md) | Parking lot for ideas after version 1 |

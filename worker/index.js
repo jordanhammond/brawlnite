@@ -1,5 +1,9 @@
-// BrawlNite server: serves the game and the high score API (specs/14-online-and-high-scores.md).
+// BrawlNite server: serves the game, the high score API (specs/14-online-and-high-scores.md)
+// and multiplayer rooms (specs/15-multiplayer.md).
 import { checkName, matchScore } from '../shared/rules.js';
+import { Room, newCode, normCode } from './room.js';
+
+export { Room };
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
@@ -71,6 +75,21 @@ async function leaderboard(env) {
   return json({ wins: wins.results, best: best.results });
 }
 
+async function createRoom(env) {
+  for (let i = 0; i < 8; i++) {
+    const code = newCode();
+    const res = await env.ROOMS.get(env.ROOMS.idFromName(code)).fetch('https://room/create', { method: 'POST' });
+    if (res.ok) return json({ code });
+  }
+  return json({ error: 'busy' }, 503);
+}
+
+function roomSocket(req, env, raw) {
+  const code = normCode(decodeURIComponent(raw));
+  if (!code) return json({ error: 'not_found' }, 404);
+  return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(req);
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -79,6 +98,9 @@ export default {
       if (req.method === 'GET' && url.pathname === '/api/leaderboard') return await leaderboard(env);
       if (req.method === 'POST' && url.pathname === '/api/register') return await register(req, env);
       if (req.method === 'POST' && url.pathname === '/api/match') return await postMatch(req, env);
+      if (req.method === 'POST' && url.pathname === '/api/room') return await createRoom(env);
+      const room = url.pathname.match(/^\/api\/room\/([^/]+)\/ws$/);
+      if (req.method === 'GET' && room) return await roomSocket(req, env, room[1]);
       return json({ error: 'not_found' }, 404);
     } catch (e) {
       console.error(e);

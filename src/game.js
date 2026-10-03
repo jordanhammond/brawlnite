@@ -15,6 +15,7 @@ const dist = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
 const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const r2 = (v) => Math.round(v * 100) / 100;
 const fmtTime = (s) => { s = Math.max(0, Math.ceil(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 // ===================================================================
@@ -474,15 +475,19 @@ function updatePadFx(now) {
     p.ring.position.y = 0.35 + t * 2.5; p.ring.scale.setScalar(1 - t * 0.35); p.ring.material.opacity = 0.8 * (1 - t);
   }
 }
+function padFx(p, h) {
+  burst(p.x, 0.5, p.z, 22, [0x5ff6ff, 0xffffff, 0x19d3ff], 9, 0.3, 0.5, 4);
+  sfx('boing', p.x, p.z);
+  if (h.isPlayer) shake = Math.max(shake, 0.3);
+}
 function updatePads(h) {
   if (!h.alive || h.y > 0 || h.vy > 0 || h.dance || h.padCd > T) return;
   for (const p of pads) {
     if (dist(h.x, h.z, p.x, p.z) > PAD_R) continue;
     h.vy = 24; h.lvx = Math.sin(h.yaw) * 17; h.lvz = Math.cos(h.yaw) * 17;
     h.launched = true; h.padCd = T + 1;
-    burst(p.x, 0.5, p.z, 22, [0x5ff6ff, 0xffffff, 0x19d3ff], 9, 0.3, 0.5, 4);
-    sfx('boing', p.x, p.z);
-    if (h.isPlayer) shake = Math.max(shake, 0.3);
+    padFx(p, h);
+    emit(['l', h.id, pads.indexOf(p)]);
     return;
   }
 }
@@ -933,13 +938,20 @@ let T = 0;                // match clock
 let heroes = [];
 let player = null;
 let diff = DIFFS.normal;
+// multiplayer (specs/15-multiplayer.md): `net` is the room connection; `auth` is false on a guest,
+// whose browser only shows the match the host runs (it never decides damage, eliminations or pickups)
+let net = null;
+let auth = true;
 const blobGeo = new THREE.CircleGeometry(1, 20);
 const blobMat = basic(0x000000, { transparent: true, opacity: 0.3, depthWrite: false });
 
 class Hero {
-  constructor(key, isPlayer, name) {
+  constructor(key, isPlayer, name, o = {}) {
     this.key = key; this.def = HEROES[key]; this.isPlayer = isPlayer; this.name = name;
-    this.label = isPlayer ? name : `${this.def.emoji} ${name}`;
+    this.id = o.id || 0; this.pid = o.pid ?? null; this.human = this.pid !== null;
+    this.remote = this.human && !isPlayer; // a friend playing on another device
+    this.puppet = !!o.puppet;               // on a guest: moved by the host's snapshots, not simulated here
+    this.label = this.human ? name : `${this.def.emoji} ${name}`;
     this.mats = []; this.matCache = {};
     this.root = new THREE.Group(); scene.add(this.root);
     this.rig = MODELS[key](this);
@@ -958,13 +970,14 @@ class Hero {
     this.numAcc = 0; this.numT = 0; this.laserSfxT = 0;
     this.mx = 0; this.mz = 0; this.dance = null; this.danceT = 0;
     this.lvx = 0; this.lvz = 0; this.launched = false; this.padCd = 0;
-    this.ai = isPlayer ? null : { target: null, think: 0, strafe: 1, strafeT: 0, wander: null, goal: null, react: 0, stuckT: 0, lx: 0, lz: 0 };
+    this.ai = this.human ? null : { target: null, think: 0, strafe: 1, strafeT: 0, wander: null, goal: null, react: 0, stuckT: 0, lx: 0, lz: 0 };
     if (key === 'brickster') this.shieldMesh = makeShield(this);
     if (key === 'barf') this.beam = makeBeam();
     this.tag = null;
     if (!isPlayer) {
-      this.tag = document.createElement('div'); this.tag.className = 'tag';
-      this.tag.innerHTML = `<div>${this.label}</div><div class="hb"><i></i></div>`;
+      this.tag = document.createElement('div'); this.tag.className = this.human ? 'tag human' : 'tag';
+      this.tag.innerHTML = '<div></div><div class="hb"><i></i></div>';
+      this.tag.firstChild.textContent = this.label;
       this.tagFill = this.tag.querySelector('i');
       $('tags').appendChild(this.tag);
     }
@@ -1103,9 +1116,11 @@ function explode(x, z, radius, dmg, owner, isSuper) {
   }
 }
 
-function attack(h, yaw, aimDist = 15) {
-  if (h.cd > 0 || !h.alive || h.lasering || h.dashing || h.frozen) return false;
+// `force`: a guest replaying an attack the host already allowed
+function attack(h, yaw, aimDist = 15, force = false) {
+  if (!force && (h.cd > 0 || !h.alive || h.lasering || h.dashing || h.frozen)) return false;
   h.cd = h.def.attackCd;
+  emit(['a', h.id, r2(yaw), r2(aimDist)]);
   h.yaw = yaw;
   switch (h.key) {
     case 'brickster':
@@ -1168,8 +1183,8 @@ function attack(h, yaw, aimDist = 15) {
   return true;
 }
 
-function useSuper(h, yaw) {
-  if (h.superCharge < 100 || !h.alive || h.lasering || h.dashing || h.frozen) return false;
+function useSuper(h, yaw, force = false, holeDist) {
+  if (!force && (h.superCharge < 100 || !h.alive || h.lasering || h.dashing || h.frozen)) return false;
   h.superCharge = 0;
   h.yaw = yaw;
   switch (h.key) {
@@ -1223,7 +1238,7 @@ function useSuper(h, yaw) {
         if (e === h || !e.alive || dist(h.x, h.z, e.x, e.z) > 9 + e.radius) continue;
         damage(e, 15, h, { isSuper: true });
         e.fearUntil = T + 3; e.fearX = h.x; e.fearZ = h.z;
-        if (e.isPlayer) popup('😱 SCARED!');
+        notify(e, 'p', '😱 SCARED!');
       }
       sfx('scream', h.x, h.z);
       break;
@@ -1245,7 +1260,8 @@ function useSuper(h, yaw) {
       break;
     case 'glaxo': {
       const t = h.ai && h.ai.target;
-      const d = t ? clamp(dist(h.x, h.z, t.x, t.z), 3, 10) : 6;
+      const d = holeDist ?? (t ? clamp(dist(h.x, h.z, t.x, t.z), 3, 10) : 6);
+      holeDist = r2(d);
       spawnHole(h, h.x + Math.sin(yaw) * d, h.z + Math.cos(yaw) * d);
       sfx('hole', h.x, h.z);
       break;
@@ -1255,23 +1271,25 @@ function useSuper(h, yaw) {
       sfx('pickup', h.x, h.z);
       break;
   }
-  if (h.isPlayer) popup('⭐ SUPER!');
+  notify(h, 'p', '⭐ SUPER!');
+  emit(['s', h.id, r2(yaw), holeDist ?? 0]);
   return true;
 }
 
 function damage(t, amt, src, o = {}) {
-  if (!t.alive || amt <= 0 || t.dance) return;
+  if (!auth || !t.alive || amt <= 0 || t.dance) return;
   if (t.shielded) {
-    if (src && src.isPlayer && T - (t.blockT || 0) > 0.5) { t.blockT = T; floatNum(t, 'BLOCKED', '#9fd3ff'); }
+    if (src && src.human && T - (t.blockT || 0) > 0.5) { t.blockT = T; notify(src, 'b', t.id); }
     return;
   }
   if (src) {
     if (src.has('strength')) amt *= 1.5;
-    if (src.doubleNext && !o.isSuper) { amt *= 2; src.doubleNext = false; if (src.isPlayer) popup('🥷 DOUBLE DAMAGE!'); }
-    if (!src.isPlayer) amt *= diff.dmg;
+    if (src.doubleNext && !o.isSuper) { amt *= 2; src.doubleNext = false; notify(src, 'p', '🥷 DOUBLE DAMAGE!'); }
+    if (!src.human) amt *= diff.dmg;
     if (!o.isSuper) src.superCharge = Math.min(100, src.superCharge + amt * src.def.chargeRate);
     t.flashT = 0.12; t.lastHitBy = src; t.lastHitT = T;
     if (src.isPlayer) { t.numAcc += amt; if (!o.quiet) sfx('hit'); }
+    else if (src.remote) netHit(src, t, amt, o.quiet);
   }
   if (t.grown) amt *= 0.6;
   if (t.isPlayer) hurt = Math.min(1, hurt + amt / 40);
@@ -1283,30 +1301,44 @@ function damage(t, amt, src, o = {}) {
 }
 
 function eliminate(h, killer, cause) {
+  if (!auth || !h.alive) return;
+  const place = heroes.filter((e) => e.alive).length;
+  if (killer && killer !== h) killer.kills++;
+  showElim(h, killer, cause);
+  if (!h.human) spawnPickup('health', h.x, h.z, true);
+  if (killer && killer.human && killer !== h) notify(killer, 'p', `💥 Nice one, ${killer.name}!`);
+  emit(['e', h.id, killer ? killer.id : -1, cause || '', place, h.kills]);
+  checkEnd(h, place);
+}
+// the part of an elimination everyone sees (guests run only this, when the host tells them)
+function showElim(h, killer, cause) {
   h.alive = false; h.hp = 0; h.deadT = 0;
   h.laserUntil = 0; h.shieldUntil = 0; h.burst = 0;
   if (h.beam) h.beam.visible = false;
   if (h.shieldMesh) h.shieldMesh.visible = false;
   if (h.tag) h.tag.style.display = 'none';
   if (killer && killer !== h) {
-    killer.kills++;
     feed(cause === 'blackhole' ? `${killer.label} sucked ${h.label} into a black hole 🌌` : `${killer.label} eliminated ${h.label}`);
   } else {
-    feed(`${h.label} ${cause === 'lava' ? 'melted in the lava 🌋' : 'was lost in the storm 🌀'}`);
+    feed(`${h.label} ${cause === 'lava' ? 'melted in the lava 🌋' : cause === 'quit' ? 'left the match 👋' : 'was lost in the storm 🌀'}`);
   }
+  if (cause === 'blackhole') { h.root.visible = false; h.deadT = 99; }
+  if (h === player && net) watch = killer && killer.alive ? killer : null;
   sfx('elim', h.x, h.z);
-  if (!h.isPlayer) spawnPickup('health', h.x, h.z, true);
-  if (killer && killer.isPlayer) popup(`💥 Nice one, ${playerName}!`);
   leftBanner();
-  checkEnd();
 }
 
 const iceGeo = new THREE.BoxGeometry(2.4, 3.4, 2.4);
 const iceMat = basic(0x9fe8ff, { transparent: true, opacity: 0.45, depthWrite: false });
 function freeze(e, secs) {
+  if (!auth) return;
   e.frozenUntil = T + secs; e.mx = e.mz = 0;
-  if (!e.iceMesh) { e.iceMesh = new THREE.Mesh(iceGeo, iceMat); e.iceMesh.position.y = 1.6; e.root.add(e.iceMesh); }
-  e.iceMesh.scale.setScalar(e.def.scale * e.size);
+}
+function iceFx(h) {
+  if (h.frozen && !h.iceMesh) { h.iceMesh = new THREE.Mesh(iceGeo, iceMat); h.iceMesh.position.y = 1.6; h.root.add(h.iceMesh); }
+  if (!h.iceMesh) return;
+  h.iceMesh.visible = h.frozen;
+  if (h.frozen) h.iceMesh.scale.setScalar(h.def.scale * h.size);
 }
 
 const pizzaTex = canvasTex(256, 256, (g, w) => {
@@ -1338,7 +1370,7 @@ function updateZones(dt) {
     for (const h of heroes) {
       if (!h.alive || dist(h.x, h.z, z.x, z.z) > z.r) continue;
       if (h === z.owner) {
-        h.hp = Math.min(h.maxHp, h.hp + 25 * dt);
+        if (auth) h.hp = Math.min(h.maxHp, h.hp + 25 * dt);
         if (Math.random() < 0.2) spawnP(h.x + rand(-0.6, 0.6), h.y + 0.5, h.z + rand(-0.6, 0.6), 0, 2.5, 0, 0x4cd964, 0.25, 0.6);
       } else {
         h.stuckUntil = T + 0.15;
@@ -1375,7 +1407,7 @@ function updateTornados(dt) {
     t.mesh.position.set(t.x, 0, t.z);
     t.mesh.children.forEach((m, k) => { m.rotation.y += dt * (8 + k); m.position.x = Math.sin(T * 5 + k) * 0.25 * k; });
     if (Math.random() < 0.8) spawnP(t.x + rand(-2, 2), rand(0, 6), t.z + rand(-2, 2), rand(-3, 3), 3, rand(-3, 3), pick([0xffffff, 0xb0b8c4, 0x8a7a6a]), 0.25, 0.5);
-    for (const e of heroes) if (e !== t.owner && e.alive && !t.carried.has(e) && dist(t.x, t.z, e.x, e.z) < 3.5 + e.radius) t.carried.add(e);
+    if (auth) for (const e of heroes) if (e !== t.owner && e.alive && !t.carried.has(e) && dist(t.x, t.z, e.x, e.z) < 3.5 + e.radius) t.carried.add(e);
     let k = 0;
     for (const e of t.carried) {
       if (!e.alive) { t.carried.delete(e); continue; }
@@ -1410,12 +1442,10 @@ function updateHoles(dt) {
     for (const e of heroes) {
       if (e === o.owner || !e.alive) continue;
       const dx = o.x - e.x, dz = o.z - e.z, d = Math.hypot(dx, dz) || 0.01;
-      if (d < 1.4 + e.radius * 0.5 && !e.shielded) {
+      if (d < 1.4 + e.radius * 0.5 && !e.shielded && auth) {
         burst(o.x, 1, o.z, 30, [0x8a4dff, 0xffffff, 0x000000], 6, 0.35, 0.6, 0);
-        e.hp = 0; eliminate(e, o.owner, 'blackhole');
-        e.root.visible = false; e.deadT = 99;
-        if (e.tag) e.tag.style.display = 'none';
-      } else if (d < 5 && !e.shielded) { e.x += dx / d * 4 * dt; e.z += dz / d * 4 * dt; }
+        eliminate(e, o.owner, 'blackhole');
+      } else if (d < 5 && !e.shielded && auth) { e.x += dx / d * 4 * dt; e.z += dz / d * 4 * dt; }
     }
     if (T > o.until) { scene.remove(o.mesh); holes.splice(i, 1); }
   }
@@ -1443,7 +1473,6 @@ function collide(h) {
 
 function updateHero(h, dt) {
   if (!h.alive) { updateDead(h, dt); return; }
-  const s = h.def.scale;
   if (!h.lasering) h.superCharge = Math.min(100, h.superCharge + 2 * dt);
   h.cd -= dt;
 
@@ -1462,6 +1491,21 @@ function updateHero(h, dt) {
   const lava = h.y < 0.3 && inLava(h.x, h.z);
   let speed = h.def.speed * (h.has('speed') ? 1.6 : 1) * (h.lasering ? 0.5 : 1) * (lava ? 0.75 : 1)
     * (h.has('slow') ? 0.6 : 1) * (h.stuckUntil > T ? 0.25 : 1) * (h.frozen ? 0 : 1);
+  if (h.puppet || h.carried) { // a guest's view of someone else: the host's snapshots move them
+    if (h.dashing) for (let i = 0; i < 3; i++) spawnP(h.x + rand(-0.5, 0.5), h.y + rand(0.5, 2.5), h.z + rand(-0.5, 0.5), 0, 0, 0, pick([0x5ff6ff, 0x2f7bff, 0xffffff]), rand(0.15, 0.35), 0.35);
+  } else moveHero(h, dt, speed);
+
+  // environment damage
+  if (lava) {
+    damage(h, 30 * dt, null, { cause: 'lava' });
+    if (Math.random() < 0.3) spawnP(h.x + rand(-0.6, 0.6), 0.3, h.z + rand(-0.6, 0.6), 0, rand(2, 4), 0, pick([0xff6a00, 0xffd23f]), 0.25, 0.5, 2);
+  }
+  if (h.alive && outsideStorm(h.x, h.z)) damage(h, stormDamage() * dt, null, { cause: 'storm' });
+  if (!h.alive) return;
+  updateHeroFx(h, dt, speed);
+}
+
+function moveHero(h, dt, speed) {
   if (h.dashing) {
     const step = 42 * dt;
     h.x += h.dashDir.x * step; h.z += h.dashDir.z * step;
@@ -1495,15 +1539,10 @@ function updateHero(h, dt) {
     }
   }
   updatePads(h);
+}
 
-  // environment damage
-  if (lava) {
-    damage(h, 30 * dt, null, { cause: 'lava' });
-    if (Math.random() < 0.3) spawnP(h.x + rand(-0.6, 0.6), 0.3, h.z + rand(-0.6, 0.6), 0, rand(2, 4), 0, pick([0xff6a00, 0xffd23f]), 0.25, 0.5, 2);
-  }
-  if (h.alive && outsideStorm(h.x, h.z)) damage(h, stormDamage() * dt, null, { cause: 'storm' });
-  if (!h.alive) return;
-
+function updateHeroFx(h, dt, speed) {
+  const s = h.def.scale;
   // Barf Bush: leaf barf stream
   if (h.barfUntil > T) {
     const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
@@ -1529,7 +1568,7 @@ function updateHero(h, dt) {
   }
   // Frosty's slow / freeze, Chomp's grow
   if (h.has('slow') && Math.random() < 0.3) spawnP(h.x + rand(-0.6, 0.6), h.y + rand(0.3, 2.5), h.z + rand(-0.6, 0.6), 0, -1, 0, 0xdffaff, 0.18, 0.5);
-  if (h.iceMesh) h.iceMesh.visible = h.frozen;
+  iceFx(h);
   h.size = lerp(h.size, h.grown ? 1.5 : 1, 1 - Math.exp(-8 * dt));
   h.rig.body.scale.setScalar(h.def.scale * h.size);
   h.blob.scale.setScalar(h.radius * 1.1);
@@ -1757,8 +1796,9 @@ function hitWall(p) {
 function hitHero(p, e) {
   if (p.type === 'rocket') { explode(p.x, p.z, 6, p.dmg, p.owner, true); return; }
   damage(e, p.dmg, p.owner, { isSuper: p.isSuper });
+  if (!auth) { burst(p.x, p.y, p.z, 8, IMPACT[p.type], 5, 0.22, 0.4, 12); if (p.kb && !e.puppet) { e.kbx += p.vx / p.speed * p.kb; e.kbz += p.vz / p.speed * p.kb; } return; }
   if (p.type === 'snow') e.fx.slow = T + 2;
-  if (p.type === 'ink') { e.inkUntil = T + 2; if (e.isPlayer) inkSplat(); }
+  if (p.type === 'ink') { e.inkUntil = T + 2; notify(e, 'i'); }
   if (p.kb) { e.kbx += p.vx / p.speed * p.kb; e.kbz += p.vz / p.speed * p.kb; }
   burst(p.x, p.y, p.z, 8, IMPACT[p.type], 5, 0.22, 0.4, 12);
 }
@@ -1767,6 +1807,7 @@ function hitHero(p, e) {
 // Pickups (specs/04-pickups.md)
 // ===================================================================
 let pickups = [];
+let pickupsDirty = false; // the host sends the pickup list to guests when it changes
 const ringGeo = new THREE.RingGeometry(0.9, 1.25, 24);
 const ringMats = {};
 for (const t in PICKUP_TYPES) ringMats[t] = basic(PICKUP_TYPES[t].ring, { transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide });
@@ -1785,23 +1826,26 @@ function placePickup(p, x, z) {
   p.x = x; p.z = z;
   p.sprite.position.set(x, 1.4, z); p.ring.position.set(x, 0.08, z);
   p.sprite.visible = p.ring.visible = true; p.active = true;
+  pickupsDirty = true;
 }
 function updatePickups(dt) {
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i];
     if (!p.active) {
-      if (!p.temp && T > p.respawnAt) { const s = freeSpot(5, ISLAND_R - 6, 1.5); placePickup(p, s.x, s.z); }
+      if (auth && !p.temp && T > p.respawnAt) { const s = freeSpot(5, ISLAND_R - 6, 1.5); placePickup(p, s.x, s.z); }
       continue;
     }
     p.sprite.position.y = 1.4 + Math.sin(T * 3 + p.phase) * 0.25;
     p.sprite.material.rotation = Math.sin(T * 2 + p.phase) * 0.2;
     p.ring.scale.setScalar(1 + Math.sin(T * 4 + p.phase) * 0.1);
+    if (!auth) continue;
     for (const h of heroes) {
       if (!h.alive || dist(h.x, h.z, p.x, p.z) > h.radius + 0.8) continue;
       applyPickup(h, p.type);
       p.active = false; p.sprite.visible = p.ring.visible = false;
       if (p.temp) { scene.remove(p.sprite, p.ring); pickups.splice(i, 1); }
       else p.respawnAt = T + 25;
+      pickupsDirty = true;
       break;
     }
   }
@@ -1810,7 +1854,7 @@ function applyPickup(h, type) {
   if (type === 'health') h.hp = Math.min(h.maxHp, h.hp + 60);
   else h.fx[type] = T + ({ strength: 10, speed: 8, invis: 5 })[type];
   burst(h.x, 1.5, h.z, 14, [PICKUP_TYPES[type].ring, 0xffffff], 5, 0.25, 0.6, 2);
-  if (h.isPlayer) { popup(PICKUP_TYPES[type].label); sfx('pickup'); }
+  notify(h, 'pk', PICKUP_TYPES[type].label);
 }
 
 // ===================================================================
@@ -1989,8 +2033,11 @@ window.addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (state !== 'play' || !player || !player.alive) return;
-  if (e.code === 'KeyE') useSuper(player, player.yaw);
-  if (e.code === 'Space' && player.y === 0) player.vy = 9;
+  if (e.code === 'KeyE') { // a guest shows its own super straight away; the host makes it count
+    if (useSuper(player, player.yaw) && !auth) player.supLock = T + 0.6;
+    if (net && !net.host) { net.su++; sendInput(); }
+  }
+  if (e.code === 'Space' && player.y === 0) { player.vy = 9; if (net && !net.host) { net.ju++; sendInput(); } }
   if (e.code === 'Escape' && !locked) pause();
 });
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -2036,13 +2083,13 @@ aimRing.rotation.x = -Math.PI / 2; aimRing.visible = false; scene.add(aimRing);
 
 const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3();
 function updateCamera(dt) {
-  if (state === 'menu') {
+  if (!player) {
     const a = performance.now() * 0.00005;
     camera.position.set(Math.cos(a) * 75, 32, Math.sin(a) * 75);
     camera.lookAt(0, 10, 0);
     return;
   }
-  const h = player, s = h.def.scale;
+  const h = viewHero(), s = h.def.scale;
   if (h.dance) {
     // swing round to the front of the dancing hero and sway gently
     const a = h.yaw + Math.sin(h.danceT * 0.5) * 0.5, d = 6.5 * s;
@@ -2063,7 +2110,7 @@ function updateCamera(dt) {
   }
   camera.lookAt(camLook);
 
-  aimRing.visible = h.key === 'boomer' && h.alive && state === 'play';
+  aimRing.visible = h === player && h.key === 'boomer' && h.alive && state === 'play';
   if (aimRing.visible) { const ad = boomerAimDist() + 0.8; aimRing.position.set(h.x + fx * ad, 0.1, h.z + fz * ad); }
 }
 
@@ -2130,13 +2177,14 @@ function drawMinimap() {
   const nc = nextCircle();
   if (storm.i < STORM_PHASES.length) { mm.strokeStyle = '#ffffff'; mm.lineWidth = 1.5; mm.beginPath(); mm.arc(X(nc.x), Y(nc.z), Math.max(0.5, nc.r * S), 0, TAU); mm.stroke(); }
   // player arrow
-  const h = player, px = X(h.x), py = Y(h.z), dx = -Math.sin(h.yaw), dy = -Math.cos(h.yaw);
+  const h = viewHero(), px = X(h.x), py = Y(h.z), dx = -Math.sin(h.yaw), dy = -Math.cos(h.yaw);
   mm.fillStyle = '#ffd23f'; mm.strokeStyle = '#000'; mm.lineWidth = 1.5;
   mm.beginPath(); mm.moveTo(px + dx * 8, py + dy * 8); mm.lineTo(px - dx * 5 + dy * 5, py - dy * 5 - dx * 5); mm.lineTo(px - dx * 5 - dy * 5, py - dy * 5 + dx * 5); mm.closePath(); mm.fill(); mm.stroke();
 }
 
 function updateHUD(dt) {
   const h = player;
+  $('hud').classList.toggle('watching', viewHero() !== player);
   $('hpfill').style.transform = `scaleX(${Math.max(0, h.hp / h.maxHp)})`;
   setText($('hptxt'), `${Math.ceil(Math.max(0, h.hp))} / ${h.maxHp}`);
   $('superfill').style.transform = `scaleX(${h.superCharge / 100})`;
@@ -2225,6 +2273,8 @@ async function registerOnline(rec, name) {
   return (NAME_ERRORS[r.error] || 'Something went wrong. Try again.').replace('{name}', name);
 }
 let loggingIn = false;
+// ?room=LAVA-42 joins that room straight away (specs/15-multiplayer.md)
+let pendingRoom = ONLINE ? new URLSearchParams(location.search).get('room') : null;
 async function login(raw) {
   if (loggingIn) return false;
   const check = checkName(raw);
@@ -2253,7 +2303,8 @@ async function login(raw) {
   profiles.current = name; playerName = name; save = profiles.players[name];
   storeSave();
   showMenu();
-  if (ONLINE && !save.id && !save.onlineError) registerOnline(save, name).then(() => renderCards()); // older local profile
+  if (ONLINE && !save.id && !save.onlineError) registerOnline(save, name).then(() => { if (state === 'menu') renderCards(); }); // older local profile
+  if (pendingRoom) { const code = pendingRoom; pendingRoom = null; showJoin(code); joinRoom(code); }
   return true;
 }
 function nameMsg(text, calm) { const el = $('namemsg'); el.textContent = text || ''; el.classList.toggle('calm', !!calm); }
@@ -2281,46 +2332,90 @@ function clearMatch() {
   for (const f of floats) f.el.remove();
   floats.length = 0;
   $('tags').innerHTML = ''; $('feed').innerHTML = '';
+  watch = null; $('hud').classList.remove('watching');
+  if (net) Object.assign(net, { snaps: [], evq: [], hist: [], corr: null, events: [], notes: {} });
 }
 
+// solo, or the host of an online match: real players first, then bots fill up to 10 heroes
 function startMatch() {
+  if (net && !net.host) return;
+  const humans = net ? net.roster.map((p) => ({ key: HEROES[p.hero] ? p.hero : 'brickster', name: p.name, pid: p.pid }))
+    : [{ key: chosenHero, name: playerName, pid: 0 }];
+  const pool = HERO_KEYS.filter(isRevealed);
+  const botKeys = shuffle([...pool, ...pool, ...pool]).slice(0, Math.max(0, 10 - humans.length));
+  const taken = humans.map((p) => p.name.toLowerCase());
+  const names = shuffle(BOT_NAMES.filter((n) => !taken.includes(n.toLowerCase())));
+  const list = [...humans, ...botKeys.map((k, i) => ({ key: k, name: names[i], pid: null }))];
+
+  const off = rand(0, TAU);
+  const pos = list.map((_, i) => {
+    const a = off + (i / list.length) * TAU;
+    let x = Math.cos(a) * 60, z = Math.sin(a) * 60;
+    if (!isFree(x, z, 2)) { const s = freeSpot(0, 6, 2, Math.random, x, z); x = s.x; z = s.z; }
+    return [r2(x), r2(z)];
+  });
+  resetStorm();
+  const pk = [];
+  for (let i = 0; i < 24; i++) { const s = freeSpot(20, ISLAND_R - 6, 1.5); pk.push([i % 4, r2(s.x), r2(s.z), 1, 0]); }
+
+  const setup = { heroes: list, pos, storm: storm.circles, pk, diff: chosenDiff };
+  if (net) netSend({ t: 'start', ...setup });
+  beginMatch(setup);
+}
+// everyone (solo, host and guests) builds the match from the same setup
+function beginMatch(setup) {
   clearMatch();
   const a = audio(); if (a && a.state === 'suspended') a.resume();
   T = 0; shake = 0; hurt = 0; camPitch = 0.22;
-  diff = DIFFS[chosenDiff];
-  resetStorm();
-
-  const pool = HERO_KEYS.filter(isRevealed);
-  const botKeys = shuffle([...pool, ...pool, ...pool]).slice(0, 9);
-  const names = shuffle(BOT_NAMES.filter((n) => n.toLowerCase() !== playerName.toLowerCase()));
-  player = new Hero(chosenHero, true, playerName);
-  heroes.push(player);
-  botKeys.forEach((k, i) => heroes.push(new Hero(k, false, names[i])));
-
-  const off = rand(0, TAU);
-  heroes.forEach((h, i) => {
-    const a = off + (i / heroes.length) * TAU;
-    let x = Math.cos(a) * 60, z = Math.sin(a) * 60;
-    if (!isFree(x, z, 2)) { const s = freeSpot(0, 6, 2, Math.random, x, z); x = s.x; z = s.z; }
+  diff = DIFFS[setup.diff] || DIFFS.normal;
+  auth = !net || net.host;
+  storm.circles = setup.storm.map((c) => ({ ...c }));
+  storm.i = 0; storm.t = 0; storm.shrinking = false; storm.cur = { ...storm.circles[0] };
+  const me = net ? net.pid : 0;
+  setup.heroes.forEach((d, i) => {
+    const mine = d.pid === me;
+    const h = new Hero(d.key, mine, d.name, { id: i, pid: d.pid, puppet: !auth && !mine });
+    const [x, z] = setup.pos[i];
     h.x = x; h.z = z; h.yaw = Math.atan2(-x, -z);
     h.root.position.set(x, 0, z);
+    heroes.push(h);
+    if (mine) player = h;
   });
-
-  const types = Object.keys(PICKUP_TYPES);
-  for (let i = 0; i < 24; i++) { const s = freeSpot(20, ISLAND_R - 6, 1.5); spawnPickup(types[i % 4], s.x, s.z, false); }
+  syncPickups(setup.pk);
+  updateStorm(0);
+  if (net) Object.assign(net, { live: true, over: false, su: 0, ju: 0, snapT: 0, hitT: 0, inT: 0 });
 
   camera.position.set(player.x, 10, player.z);
-  $('menu').classList.add('hidden'); $('end').classList.add('hidden'); $('pause').classList.add('hidden');
+  for (const id of ['menu', 'end', 'pause', 'lobby', 'join', 'notice']) $(id).classList.add('hidden');
   $('hud').classList.remove('hidden');
   state = 'play';
   requestLock();
-  popup(`🌋 Good luck, ${playerName}!`);
+  popup(auth ? `🌋 Good luck, ${playerName}!` : `🌋 Good luck, ${playerName}! Click to aim`);
+}
+const PICKUP_KEYS = Object.keys(PICKUP_TYPES);
+const pickupList = () => pickups.map((p) => [PICKUP_KEYS.indexOf(p.type), r2(p.x), r2(p.z), p.active ? 1 : 0, p.temp ? 1 : 0]);
+function syncPickups(list) {
+  while (pickups.length > list.length) { const p = pickups.pop(); scene.remove(p.sprite, p.ring); }
+  list.forEach(([ti, x, z, active, temp], i) => {
+    const type = PICKUP_KEYS[ti] || 'health';
+    let p = pickups[i];
+    if (!p) { spawnPickup(type, x, z, !!temp); p = pickups[i]; }
+    else if (p.type !== type) { p.type = type; p.sprite.material = spriteMats[type]; p.ring.material = ringMats[type]; }
+    p.temp = !!temp;
+    placePickup(p, x, z);
+    if (!active) { p.active = false; p.sprite.visible = p.ring.visible = false; }
+  });
+  pickupsDirty = false;
 }
 
 function pause() {
   if (state !== 'play') return;
   state = 'paused'; mouseDown = false;
-  $('pausesub').textContent = `Take a break, ${playerName}`;
+  // online there's no pausing: the match keeps going behind this menu
+  $('pause').classList.toggle('online', !!net);
+  $('pausetitle').textContent = net ? 'MENU' : 'PAUSED';
+  $('pausesub').textContent = net ? 'The match keeps going! Your hero is standing still.' : `Take a break, ${playerName}`;
+  $('quit').textContent = net ? 'Leave match' : 'Quit to menu';
   $('pause').classList.remove('hidden');
 }
 function resume() {
@@ -2346,7 +2441,8 @@ function showLogin() {
   setTimeout(() => $('nameinput').focus(), 50);
 }
 function showMenu() {
-  $('login').classList.add('hidden'); $('scores').classList.add('hidden');
+  leaveRoom();
+  for (const id of ['login', 'scores', 'lobby', 'join', 'notice']) $(id).classList.add('hidden');
   clearMatch();
   renderCards();
   state = 'menu';
@@ -2355,13 +2451,26 @@ function showMenu() {
   $('menu').classList.remove('hidden');
 }
 
-function checkEnd() {
-  if (state !== 'play' && state !== 'paused') return;
-  const alive = heroes.filter((h) => h.alive).length;
-  if (!player.alive) endMatch(false, alive + 1);
-  else if (alive === 1) endMatch(true, 1);
+function checkEnd(dead, place) {
+  const alive = heroes.filter((h) => h.alive);
+  if (!net) {
+    if (state !== 'play' && state !== 'paused') return;
+    if (!player.alive) endMatch(false, alive.length + 1);
+    else if (alive.length === 1) endMatch(true, 1);
+    return;
+  }
+  // online host: you can be out while the match goes on for everyone else
+  if (dead === player) endMatch(false, place);
+  if (alive.length <= 1 && net.live) {
+    const w = alive[0];
+    emit(['w', w ? w.id : -1, w ? w.kills : 0]);
+    sendSnapshot();
+    if (w === player) endMatch(true, 1);
+    matchOver(w);
+  }
 }
 function endMatch(won, place) {
+  if (state !== 'play' && state !== 'paused') return;
   state = 'ending'; mouseDown = false;
   if (won) startDance(player);
   save.games++; save.elims += player.kills;
@@ -2383,7 +2492,8 @@ function endMatch(won, place) {
     if (document.pointerLockElement) document.exitPointerLock();
     $('pause').classList.add('hidden');
     $('popup').style.opacity = 0; popupT = 0;
-    $('end').classList.toggle('win', won);
+    $('end').classList.toggle('win', won || !!net); // online: see-through, so you can watch the match
+    renderEndButtons();
     $('endtitle').textContent = won ? '🏆 YOU WON!' : 'ELIMINATED';
     const k = player.kills;
     $('endsub').textContent = won
@@ -2433,8 +2543,8 @@ function renderScores(data) {
 }
 
 // menu: hero cards + difficulty
-function renderCards() {
-  const wrap = $('cards');
+function renderCards(wrapId = 'cards') {
+  const wrap = $(wrapId);
   wrap.innerHTML = '';
   if (!isUnlocked(chosenHero)) chosenHero = 'brickster';
   const bar = (label, v) => `<div class="stat"><span>${label}</span><div class="bar"><i style="width:${v * 100}%"></i></div></div>`;
@@ -2450,11 +2560,13 @@ function renderCards() {
     if (open) card.addEventListener('click', () => {
       chosenHero = k;
       wrap.querySelectorAll('.card').forEach((c) => c.classList.toggle('sel', c.dataset.hero === k));
+      if (state === 'lobby') netSend({ t: 'hero', hero: k });
     });
     wrap.appendChild(card);
   }
   $('record').textContent = `👋 Hi, ${playerName}! · 🏆 Wins: ${save.wins} · Games: ${save.games} · Eliminations: ${save.elims}`;
   $('showscores').classList.toggle('hidden', !ONLINE);
+  $('onlinerow').classList.toggle('hidden', !ONLINE);
   $('onlinewarn').textContent = ONLINE && save.onlineError === 'taken' ? `⚠️ "${playerName}" is taken online, so your scores aren't on the high score list. Change player to pick another name.`
     : ONLINE && save.onlineError === 'bad_word' ? '⚠️ This name can\'t go on the high score list. Change player to pick another name.' : '';
 }
@@ -2465,7 +2577,17 @@ function buildMenu() {
     document.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('sel', x === b));
   }));
   $('play').addEventListener('click', startMatch);
-  $('again').addEventListener('click', startMatch);
+  $('again').addEventListener('click', () => (net ? backToLobby() : startMatch()));
+  $('hostbtn').addEventListener('click', hostGame);
+  $('joinmenu').addEventListener('click', () => showJoin());
+  $('joinbtn').addEventListener('click', () => joinRoom($('codeinput').value));
+  $('codeinput').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('codeinput').value); });
+  $('codeinput').addEventListener('input', () => { $('joinmsg').textContent = ''; });
+  $('joinback').addEventListener('click', showMenu);
+  $('lobbystart').addEventListener('click', startMatch);
+  $('lobbyleave').addEventListener('click', showMenu);
+  $('noticeok').addEventListener('click', showMenu);
+  $('watchnext').addEventListener('click', () => nextWatch(1));
   $('tomenu').addEventListener('click', showMenu);
   $('resume').addEventListener('click', resume);
   $('quit').addEventListener('click', showMenu);
@@ -2480,12 +2602,408 @@ function buildMenu() {
 }
 
 // ===================================================================
+// Multiplayer (specs/15-multiplayer.md)
+// The host's browser runs the match. Guests send their keys and aim, and the host sends back
+// snapshots (positions, health, effects) plus events (attacks, supers, eliminations) to replay.
+// ===================================================================
+const SNAP_EVERY = 0.05;   // host → guests, 20 a second
+const INPUT_EVERY = 0.05;  // guest → host, 20 a second
+const INTERP = 0.1;        // guests draw other heroes this far in the past and slide between snapshots
+const GONE_AFTER = 10;     // a disconnected friend's hero stands still this long, then is eliminated
+const ROOM_ERRORS = {
+  not_found: "Can't find that room. Check the code 🙂",
+  started: 'That match already started. Ask for a new code!',
+  full: 'That room is full (10 players).',
+  same_name: 'Someone in that room already has your name.',
+  name: "That name can't be used online.",
+};
+let watch = null; // who you're watching after you're out
+
+const netSend = (msg) => { if (net && net.ws.readyState === 1) net.ws.send(JSON.stringify(msg)); };
+// host only: things guests should replay, sent with the next snapshot
+function emit(ev) { if (net && net.host && net.live) net.events.push(ev); }
+// feedback for one hero's player: shown here if it's you, sent to their device if it's a friend
+function notify(h, kind, ...args) {
+  if (!auth) return;
+  if (h.isPlayer) note([kind, ...args]);
+  else if (h.remote && net) (net.notes[h.pid] || (net.notes[h.pid] = [])).push([kind, ...args]);
+}
+function note([kind, a, b, c, d]) {
+  if (kind === 'p') popup(a);
+  else if (kind === 'pk') { popup(a); sfx('pickup'); }
+  else if (kind === 'i') inkSplat();
+  else if (kind === 'b') { if (heroes[a]) floatNum(heroes[a], 'BLOCKED', '#9fd3ff'); }
+  else if (kind === 'n') { if (heroes[a]) floatNum(heroes[a], b, c); if (d) sfx('hit'); }
+}
+// damage numbers for a friend's hits, grouped like the player's own
+function netHit(src, t, amt, quiet) {
+  const m = src.netHits || (src.netHits = {});
+  const e = m[t.id] || (m[t.id] = { v: 0, s: 0 });
+  e.v += amt; if (!quiet) e.s = 1;
+}
+function flushHits() {
+  for (const h of heroes) {
+    if (!h.netHits) continue;
+    for (const id in h.netHits) {
+      const e = h.netHits[id];
+      notify(h, 'n', +id, Math.round(e.v), h.lasering ? '#b6ff8a' : '#ffffff', e.s);
+    }
+    h.netHits = null;
+  }
+}
+
+// ----- room connection -----
+function normCode(raw) {
+  const m = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').match(/^([A-Z]{2,8})(\d{2})$/);
+  return m ? `${m[1]}-${m[2]}` : null;
+}
+function connect(code, host) {
+  leaveRoom();
+  const q = new URLSearchParams({ host: host ? '1' : '0', name: playerName, hero: chosenHero });
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/room/${encodeURIComponent(code)}/ws?${q}`);
+  const me = net = {
+    ws, code, host, pid: 0, roster: [], live: false, over: false, events: [], notes: {}, su: 0, ju: 0, seq: 0,
+    snaps: [], evq: [], sent: {}, hist: [], corr: null, hostT: 0, hostAt: 0, snapT: 0, hitT: 0, inT: 0,
+  };
+  ws.onmessage = (e) => {
+    if (net !== me || e.data === 'pong') return;
+    let msg; try { msg = JSON.parse(e.data); } catch (err) { return; }
+    onNet(msg);
+  };
+  ws.onclose = () => { if (net === me) showNotice('😢 Lost connection', 'The connection to the room dropped.'); };
+  me.ping = setInterval(() => { if (ws.readyState === 1) ws.send('ping'); }, 20000);
+  if (host) startTicker();
+}
+function leaveRoom() {
+  if (!net) return;
+  const n = net;
+  net = null; auth = true;
+  clearInterval(n.ping);
+  try { n.ws.close(1000); } catch (e) { /* already closed */ }
+  stopTicker();
+}
+const hostName = () => (net && (net.roster.find((p) => p.host) || {}).name) || 'the host';
+
+function onNet(m) {
+  switch (m.t) {
+    case 'welcome': net.pid = m.pid; showLobby(); break;
+    case 'roster': net.roster = m.players; if (state === 'lobby') renderLobby(); break;
+    case 'error': {
+      const msg = ROOM_ERRORS[m.reason] || 'Something went wrong. Try again.';
+      leaveRoom();
+      if (state === 'join') { $('joinmsg').textContent = msg; $('joinbtn').disabled = false; } else showNotice('😢 Oops', msg);
+      break;
+    }
+    case 'hostleft': showNotice('😢 Host left', `${hostName()} left, so the game is over.`); break;
+    case 'expired': showNotice('⏰ Room closed', 'The waiting room closed after 30 minutes. Make a new one!'); break;
+    case 'left': if (net.host) playerLeft(m.pid); break;
+    case 'start': if (!net.host) beginMatch(m); break;
+    case 'lobby': if (!net.host) showLobby(); break;
+    case 's': if (!net.host && net.live) onSnapshot(m); break;
+    case 'n': if (!net.host) m.n.forEach(note); break;
+    case 'in': if (net.host) onInput(m); break;
+  }
+}
+
+// ----- screens: host, join, waiting room -----
+async function hostGame() {
+  $('hostbtn').disabled = true;
+  const r = await api('/api/room', {});
+  $('hostbtn').disabled = false;
+  if (!r.code) { showNotice('😢 Oops', r.error === 'offline' ? "Couldn't reach the server. Check the internet." : 'Could not make a room. Try again.'); return; }
+  connect(r.code, true);
+}
+function showJoin(prefill) {
+  showMenu();
+  $('menu').classList.add('hidden');
+  state = 'join';
+  $('codeinput').value = prefill || ''; $('joinmsg').textContent = ''; $('joinbtn').disabled = false;
+  $('join').classList.remove('hidden');
+  setTimeout(() => $('codeinput').focus(), 50);
+}
+function joinRoom(raw) {
+  const code = normCode(raw);
+  if (!code) { $('joinmsg').textContent = 'Codes look like LAVA-42'; return; }
+  $('joinmsg').textContent = 'Joining…'; $('joinbtn').disabled = true;
+  connect(code, false);
+}
+function showLobby() {
+  clearMatch();
+  state = 'lobby';
+  if (document.pointerLockElement) document.exitPointerLock();
+  for (const id of ['menu', 'join', 'end', 'pause', 'hud', 'notice']) $(id).classList.add('hidden');
+  $('lobby').classList.remove('hidden');
+  renderLobby();
+  renderCards('lobbycards');
+}
+function renderLobby() {
+  $('lobbycode').textContent = net.code;
+  const list = $('lobbylist');
+  list.innerHTML = '';
+  for (const p of net.roster) {
+    const d = HEROES[p.hero] || HEROES.brickster;
+    const el = document.createElement('div');
+    el.className = 'pill lobbyp' + (p.pid === net.pid ? ' sel' : '');
+    el.textContent = `${p.host ? '👑 ' : ''}${p.name} · ${d.emoji} ${d.name}`;
+    list.appendChild(el);
+  }
+  const n = net.roster.length;
+  $('lobbyinfo').textContent = `${n} / 10 player${n === 1 ? '' : 's'} · bots fill the empty places`
+    + (net.host ? ` · Bots: ${({ easy: '😊 Easy', normal: '😎 Normal', hard: '😈 Hard' })[chosenDiff]}` : '');
+  $('lobbystart').classList.toggle('hidden', !net.host);
+  $('lobbywait').textContent = net.host ? (n === 1 ? 'Tell your friends the code! You can also start on your own.' : '') : `Waiting for ${hostName()} to start…`;
+}
+function showNotice(title, text) {
+  showMenu();
+  $('menu').classList.add('hidden');
+  $('noticetitle').textContent = title; $('noticetext').textContent = text;
+  $('notice').classList.remove('hidden');
+}
+// host: "Play again together" sends everyone still here back to the waiting room
+function backToLobby() {
+  if (!net || !net.host) return;
+  netSend({ t: 'lobby' });
+  showLobby();
+}
+function matchOver(w) {
+  if (!net) return;
+  net.live = false; net.over = true;
+  if (w && w !== player) feed(`🏆 ${w.label} wins!`);
+  renderEndButtons();
+}
+function renderEndButtons() {
+  const on = !!net, out = on && player && !player.alive;
+  $('again').textContent = on ? '▶ Play again together' : '▶ Play again';
+  $('again').classList.toggle('hidden', on && !(net.host && net.over));
+  $('tomenu').textContent = !on ? 'Change hero' : net.host ? 'Leave (ends the game for everyone)' : 'Leave';
+  $('watchnext').classList.toggle('hidden', !out || net.over);
+  $('waitmsg').textContent = !on ? '' : net.over ? (net.host ? '' : `Waiting for ${hostName()} to play again…`)
+    : out && watch ? `👀 Watching ${watch.name}` : '';
+}
+
+// ----- watching after you're out -----
+const viewHero = () => (net && player && !player.alive && watch ? watch : player);
+function nextWatch(step) {
+  const alive = heroes.filter((h) => h.alive && h !== player);
+  if (!alive.length) return;
+  const i = alive.indexOf(watch);
+  watch = alive[(i + step + alive.length) % alive.length];
+  renderEndButtons();
+}
+function updateWatch() {
+  if (!player || player.alive || (watch && watch.alive)) return;
+  if (heroes.some((h) => h.alive && h !== player)) nextWatch(1);
+}
+
+// ----- host side -----
+const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
+function onInput(m) {
+  const h = heroes.find((e) => e.remote && e.pid === m.p);
+  if (!h || !net.live) return;
+  h.inp = { q: num(m.q), mx: clamp(num(m.mx), -1, 1), mz: clamp(num(m.mz), -1, 1), y: num(m.y, h.yaw), a: !!m.a, d: clamp(num(m.d, 15), 5, 18), su: num(m.su), ju: num(m.ju) };
+  h.inAt = T;
+}
+// a friend's hero, driven by the keys they press on their own device (like playerInput)
+function remoteInput(h) {
+  const inp = h.inp;
+  if (!h.alive) return;
+  if (!inp || h.goneAt) { h.mx = h.mz = 0; return; }
+  h.yaw = inp.y;
+  const l = Math.hypot(inp.mx, inp.mz);
+  h.mx = l > 1 ? inp.mx / l : inp.mx; h.mz = l > 1 ? inp.mz / l : inp.mz;
+  if (inp.su > (h.suSeen || 0)) { h.suSeen = inp.su; useSuper(h, h.yaw); }
+  if (inp.ju > (h.juSeen || 0)) { h.juSeen = inp.ju; if (h.y === 0) h.vy = 9; }
+  if (h.fearUntil > T) {
+    const dx = h.x - h.fearX, dz = h.z - h.fearZ, d = Math.hypot(dx, dz) || 1;
+    h.mx = dx / d; h.mz = dz / d;
+    return;
+  }
+  if (inp.a) attack(h, h.yaw, inp.d);
+}
+function playerLeft(pid) {
+  const h = heroes.find((e) => e.remote && e.pid === pid);
+  if (!h || !net.live || !h.alive || h.goneAt) return;
+  h.goneAt = T; h.inp = null;
+  feed(`${h.name} disconnected`);
+  emit(['d', h.id]);
+}
+function heroState(h) {
+  const st = {};
+  const add = (k, v) => { if (v > T) st[k] = r2(v); };
+  add('fz', h.frozenUntil); add('sh', h.shieldUntil); add('la', h.laserUntil); add('gr', h.growUntil);
+  add('su', h.stuckUntil); add('da', h.dashUntil); add('ink', h.inkUntil);
+  for (const k in h.fx) add(k, h.fx[k]);
+  if (h.fearUntil > T) st.fe = [r2(h.fearUntil), r2(h.fearX), r2(h.fearZ)];
+  if (tornados.some((t) => t.carried.has(h))) st.ca = 1;
+  return [r2(h.x), r2(h.z), r2(h.y), r2(h.yaw), r2(Math.max(0, h.hp)), Math.floor(h.superCharge), h.mx || h.mz ? 1 : 0, h.kills,
+    h.inp ? h.inp.q : 0, h.inp ? r2(T - h.inAt) : 0, Object.keys(st).length ? st : 0];
+}
+function sendSnapshot() {
+  const msg = { t: 's', T: Math.round(T * 1000) / 1000, st: [storm.i, r2(storm.t), storm.shrinking ? 1 : 0], h: heroes.map(heroState), ev: net.events };
+  if (pickupsDirty) { msg.pk = pickupList(); pickupsDirty = false; }
+  net.events = [];
+  // on a slow connection skip a plain snapshot rather than let them pile up
+  if (net.ws.bufferedAmount < 256e3 || msg.ev.length || msg.pk) netSend(msg);
+  for (const pid in net.notes) netSend({ t: 'n', to: +pid, n: net.notes[pid] });
+  net.notes = {};
+}
+
+// ----- guest side -----
+function onSnapshot(m) {
+  if (!heroes.length || !Array.isArray(m.h)) return;
+  net.snaps.push(m);
+  net.hostT = m.T; net.hostAt = performance.now() / 1000;
+  if (Math.abs(T - m.T) > 1) T = m.T; // first snapshot, or after a long hiccup
+  storm.i = m.st[0]; storm.t = m.st[1]; storm.shrinking = !!m.st[2];
+  if (!storm.shrinking && storm.circles[storm.i]) storm.cur = { ...storm.circles[storm.i] };
+  if (m.pk) syncPickups(m.pk);
+  for (const ev of m.ev || []) net.evq.push({ T: m.T, ev });
+  m.h.forEach((s, i) => { if (heroes[i]) applyHeroState(heroes[i], s); });
+}
+function applyHeroState(h, s) {
+  const [x, z, y, , hp, sc, , kills, q, age, st] = s;
+  if (hp < h.hp - 0.5) { h.flashT = 0.12; if (h.isPlayer) hurt = Math.min(1, hurt + (h.hp - hp) / 40); }
+  h.hp = hp; h.kills = kills;
+  const own = h.isPlayer, justUsedSuper = own && T < (h.supLock || 0);
+  if (justUsedSuper) return; // keep showing your own super until the host catches up
+  h.superCharge = sc;
+  const g = (k) => (st && st[k]) || 0;
+  h.frozenUntil = g('fz'); h.shieldUntil = g('sh'); h.laserUntil = g('la'); h.growUntil = g('gr');
+  h.stuckUntil = g('su'); h.inkUntil = g('ink');
+  for (const k in h.fx) h.fx[k] = g(k);
+  const fe = st && st.fe;
+  h.fearUntil = fe ? fe[0] : 0;
+  if (fe) { h.fearX = fe[1]; h.fearZ = fe[2]; }
+  if (h.shieldMesh && h.shielded && !h.shieldMesh.visible) { h.shieldMesh.visible = true; h.shieldT = 0; }
+  h.carried = !!g('ca'); // spun round by a tornado: follow the host exactly
+  if (own && h.carried) { h.x = x; h.z = z; h.y = y; h.vy = 0; net.corr = null; }
+  else if (own) reconcile(h, x, z, y, q, age);
+  else h.dashUntil = g('da');
+}
+// your own hero moves straight away on your screen; when the host's position differs, ease towards it
+function reconcile(h, x, z, y, q, age) {
+  if (!h.alive || net.sent[q] === undefined) return;
+  const p = histAt(net.sent[q] + age);
+  if (!p) return;
+  const ex = x - p.x, ez = z - p.z, ey = y - p.y;
+  if (Math.hypot(ex, ez) > 6 || Math.abs(ey) > 4) { // way off (carried by a tornado, a long lag spike): jump there
+    h.x += ex; h.z += ez; h.y += ey; shiftHist(ex, ey, ez); net.corr = null;
+  } else net.corr = { x: ex, z: ez };
+}
+function histAt(t) {
+  const H = net.hist;
+  if (!H.length || t < H[0].t) return null;
+  for (let i = H.length - 1; i >= 0; i--) {
+    if (H[i].t > t) continue;
+    const a = H[i], b = H[i + 1];
+    if (!b) return a;
+    const k = (t - a.t) / (b.t - a.t || 1);
+    return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k) };
+  }
+  return null;
+}
+function shiftHist(dx, dy, dz) { for (const p of net.hist) { p.x += dx; p.y += dy; p.z += dz; } }
+
+// runs at the start of each guest frame
+function guestFrame(dt) {
+  const now = performance.now() / 1000;
+  if (net.hostAt) T += clamp((net.hostT + (now - net.hostAt)) - T, -1, 1) * 0.1; // stay in step with the host's clock
+  const rt = T - INTERP, S = net.snaps;
+  if (S.length) {
+    while (S.length > 2 && S[1].T <= rt) S.shift();
+    const a = S[0], b = S[1] || a;
+    const k = b.T > a.T ? clamp((rt - a.T) / (b.T - a.T), 0, 1) : 0;
+    heroes.forEach((h, i) => {
+      if (!h.puppet || !a.h[i] || !b.h[i]) return;
+      const p = a.h[i], n = b.h[i];
+      h.x = lerp(p[0], n[0], k); h.z = lerp(p[1], n[1], k); h.y = lerp(p[2], n[2], k);
+      h.yaw = p[3] + angDiff(p[3], n[3]) * k;
+      h.mx = n[6]; h.mz = 0;
+    });
+  }
+  while (net.evq.length && net.evq[0].T <= rt + 0.001) runEvent(net.evq.shift().ev);
+  if (net.corr && player && player.alive) {
+    const k = 1 - Math.exp(-8 * dt), dx = net.corr.x * k, dz = net.corr.z * k;
+    player.x += dx; player.z += dz; net.corr.x -= dx; net.corr.z -= dz;
+    shiftHist(dx, 0, dz);
+  }
+}
+function runEvent(ev) {
+  if (!net) return;
+  const h = heroes[ev[1]];
+  switch (ev[0]) {
+    case 'a': if (h && !h.isPlayer && h.alive) attack(h, ev[2], ev[3], true); break;
+    case 's': if (h && !h.isPlayer && h.alive) useSuper(h, ev[2], true, ev[3] || undefined); break;
+    case 'l': if (h && !h.isPlayer && pads[ev[2]]) padFx(pads[ev[2]], h); break;
+    case 'd': if (h) feed(`${h.name} disconnected`); break;
+    case 'e':
+      if (!h || !h.alive) break;
+      h.kills = ev[5];
+      showElim(h, heroes[ev[2]], ev[3]);
+      if (h === player) endMatch(false, ev[4]);
+      break;
+    case 'w':
+      if (h && h === player) { h.kills = ev[2]; endMatch(true, 1); }
+      matchOver(h);
+      break;
+  }
+}
+function sendInput() {
+  if (!net || net.host || !net.live || !player || !player.alive) return;
+  const h = player, q = ++net.seq;
+  net.sent[q] = performance.now() / 1000; delete net.sent[q - 200];
+  netSend({ t: 'in', q, mx: r2(h.mx), mz: r2(h.mz), y: r2(h.yaw), a: state === 'play' && mouseDown ? 1 : 0, d: r2(boomerAimDist()), su: net.su, ju: net.ju });
+  net.inT = 0;
+}
+
+// runs at the end of each frame while the match is live
+function netTick(dt) {
+  if (!net.live) return;
+  if (net.host) {
+    for (const h of heroes) if (h.goneAt && h.alive && T - h.goneAt > GONE_AFTER) eliminate(h, null, 'quit');
+    if (!net.live) return;
+    net.hitT += dt; if (net.hitT >= 0.25) { net.hitT = 0; flushHits(); }
+    net.snapT += dt; if (net.snapT >= SNAP_EVERY) { net.snapT = 0; sendSnapshot(); }
+  } else {
+    if (player.alive) {
+      const now = performance.now() / 1000;
+      net.hist.push({ t: now, x: player.x, y: player.y, z: player.z });
+      while (net.hist.length && net.hist[0].t < now - 2) net.hist.shift();
+    }
+    net.inT += dt; if (net.inT >= INPUT_EVERY) sendInput();
+  }
+}
+
+// The browser stops drawing frames when the host's tab is hidden. A tiny worker keeps the match ticking.
+let ticker = null, lastFrameAt = 0, lastTickAt = 0;
+function startTicker() {
+  if (ticker) return;
+  try {
+    ticker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 50)'], { type: 'text/javascript' })));
+    ticker.onmessage = () => {
+      const now = performance.now();
+      if (!net || !net.host || now - lastFrameAt < 250) { lastTickAt = now; return; }
+      let dt = Math.min((now - lastTickAt) / 1000, 0.5);
+      lastTickAt = now;
+      while (dt > 0.001 && simulating()) { const step = Math.min(dt, 0.05); dt -= step; simulate(step); }
+    };
+  } catch (e) { ticker = null; }
+}
+function stopTicker() { if (ticker) { ticker.terminate(); ticker = null; } }
+
+// ===================================================================
 // Main loop
 // ===================================================================
+const simulating = () => state === 'play' || state === 'ending' || (!!net && net.live && (state === 'paused' || state === 'end'));
 function simulate(dt) {
   T += dt;
+  if (!auth) guestFrame(dt);
   if (state === 'play') playerInput(dt);
-  for (const h of heroes) if (!h.isPlayer && h.alive) botThink(h, dt);
+  else if (player && player.alive && !player.dance) player.mx = player.mz = 0;
+  if (auth) {
+    for (const h of heroes) if (h.remote) remoteInput(h);
+    for (const h of heroes) if (!h.human && h.alive) botThink(h, dt);
+  }
   for (const h of heroes) updateHero(h, dt);
   updateProjectiles(dt);
   updatePickups(dt);
@@ -2495,13 +3013,14 @@ function simulate(dt) {
   updateZones(dt);
   updateTornados(dt);
   updateHoles(dt);
+  if (net) { netTick(dt); updateWatch(); }
 }
 
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = clamp((now - last) / 1000, 0, 0.05);
-  last = now;
+  last = now; lastFrameAt = now;
 
   lavaTex.offset.x += dt * 0.03; lavaTex.offset.y += dt * 0.015;
   seaTex.offset.x += dt * 0.004; seaTex.offset.y -= dt * 0.002;
@@ -2510,7 +3029,7 @@ function frame(now) {
   updateSmoke(dt);
   updateEmbers(dt);
 
-  if (state === 'play' || state === 'ending') {
+  if (simulating()) {
     simulate(dt);
     updateHUD(dt);
   } else if (state === 'paused' || state === 'end') {
@@ -2532,5 +3051,6 @@ requestAnimationFrame(frame);
 const auto = new URLSearchParams(location.search).get('auto');
 if (auto && HEROES[auto]) { if (!playerName) playerName = 'Tester'; chosenHero = auto; startMatch(); }
 else if (!playerName) showLogin();
-window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, storm, simulate, get T() { return T; }, pads };
+else if (pendingRoom) { const code = pendingRoom; pendingRoom = null; showJoin(code); joinRoom(code); }
+window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, damage, storm, simulate, get T() { return T; }, pads, get net() { return net; }, get watch() { return watch; } };
 })();

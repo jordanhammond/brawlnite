@@ -14,6 +14,9 @@ WASD move · Mouse aim (or ← →) · Click attack · E super · Space jump · 
 - Run `python3 build.py` to rebuild `dist/BrawlNite.html`
 - The design lives in `specs/`, and reference art goes in `art/`
 
+## Play with friends (online only)
+On the website, one player taps **👥 Host game** and reads out the room code (like `LAVA-42`). Everyone else taps **🔑 Join game** and types it in. The host's browser runs the match, so the host should keep the game open until it ends. See `specs/15-multiplayer.md`.
+
 ## Live site
 https://brawlnite.mattlucas.live (Cloudflare Worker `brawlnite` + D1 database `brawlnite`). The custom domain is set in `wrangler.toml`. Also still reachable at https://brawlnite.run-with-it-account.workers.dev
 
@@ -45,4 +48,4 @@ npx wrangler d1 execute brawlnite --remote --command "SELECT name, name_key, win
 To block more words, add them to `shared/rules.js`, then run `npm run deploy`.
 
 ## Test the online version on this computer
-`npm run db:init:local && npm run dev`, then open http://localhost:8787
+`npm run db:init:local && npm run dev`, then open http://localhost:8787 (open it in two windows to test multiplayer)

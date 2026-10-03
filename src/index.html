@@ -127,6 +127,22 @@
   #hud.dancing #crosshair, #hud.dancing #bottom, #hud.dancing #effects, #hud.dancing #warn { display: none; }
   #end.win { justify-content: flex-end; padding-bottom: 28px;
     background: linear-gradient(rgba(20,5,0,0) 35%, rgba(20,5,0,0.85)); }
+  /* ---------- multiplayer (specs/15-multiplayer.md) ---------- */
+  .tag.human { color: var(--accent2); font-size: 13px; }
+  #hud.watching #crosshair, #hud.watching #bottom, #hud.watching #effects, #hud.watching #warn { display: none; }
+  #pause.online { background: rgba(20,5,0,0.55); }
+  #lobbycode { font-size: clamp(44px, 9vw, 84px); font-weight: 900; letter-spacing: 6px; color: var(--accent2);
+    text-shadow: 0 5px 0 #b33a00; user-select: text; margin: -6px 0; }
+  #lobbylist { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 900px; }
+  .lobbyp { cursor: default; font-size: 18px; color: var(--text); }
+  #lobbycards .card { width: 200px; }
+  #codeinput { font-size: 34px; padding: 10px 16px; border-radius: 12px; border: 3px solid #5a2a14; background: var(--panel);
+    color: var(--text); text-align: center; width: min(320px, 80vw); font-family: inherit; outline: none; user-select: text;
+    text-transform: uppercase; letter-spacing: 4px; }
+  #codeinput:focus { border-color: var(--accent2); }
+  #joinmsg, #waitmsg { min-height: 22px; margin: 0; color: var(--accent2); font-weight: 700; font-size: 18px; }
+  #waitmsg:empty { display: none; }
+  .btn:disabled { opacity: 0.6; cursor: wait; }
   #redflash { position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(255,0,0,0.0); transition: box-shadow .15s; }
 </style>
 </head>
@@ -160,6 +176,10 @@
   <div class="row">
     <button class="pill" id="switchuser">👤 Change player</button>
     <button class="pill hidden" id="showscores">🏆 High scores</button>
+  </div>
+  <div class="row hidden" id="onlinerow">
+    <button class="btn" id="hostbtn" style="font-size:18px;padding:10px 20px">👥 Host game</button>
+    <button class="btn" id="joinmenu" style="font-size:18px;padding:10px 20px">🔑 Join game</button>
   </div>
   <p class="sub" id="onlinewarn"></p>
   <div class="row">
@@ -198,8 +218,38 @@
   <button class="btn" id="scoresback">◀ Back</button>
 </div>
 
+<div id="join" class="screen hidden">
+  <h1 class="logo" style="font-size:56px">JOIN GAME</h1>
+  <p class="sub" style="font-size:22px">Type the room code from your friend:</p>
+  <input id="codeinput" maxlength="12" placeholder="LAVA-42" autocomplete="off" spellcheck="false">
+  <p id="joinmsg"></p>
+  <button class="btn" id="joinbtn">▶ JOIN</button>
+  <button class="pill" id="joinback">◀ Back</button>
+</div>
+
+<div id="lobby" class="screen hidden">
+  <h1 class="logo" style="font-size:48px">WAITING ROOM</h1>
+  <p class="sub" style="margin:0">Room code</p>
+  <div id="lobbycode"></div>
+  <div id="lobbylist"></div>
+  <p class="sub" id="lobbyinfo"></p>
+  <p id="lobbywait" class="sub"></p>
+  <div class="row">
+    <button class="btn" id="lobbystart">▶ START</button>
+    <button class="pill" id="lobbyleave">Leave</button>
+  </div>
+  <p class="sub" style="margin:0">Pick your hero:</p>
+  <div class="cards" id="lobbycards"></div>
+</div>
+
+<div id="notice" class="screen hidden">
+  <h1 class="logo" style="font-size:48px" id="noticetitle"></h1>
+  <p class="sub" id="noticetext" style="font-size:22px"></p>
+  <button class="btn" id="noticeok">OK</button>
+</div>
+
 <div id="pause" class="screen hidden">
-  <h1 class="logo" style="font-size:56px">PAUSED</h1>
+  <h1 class="logo" style="font-size:56px" id="pausetitle">PAUSED</h1>
   <p class="sub" id="pausesub"></p>
   <button class="btn" id="resume">▶ Click to resume</button>
   <button class="pill" id="quit">Quit to menu</button>
@@ -210,6 +260,8 @@
   <p class="sub" id="endsub" style="font-size:22px"></p>
   <p class="sub" id="unlockmsg"></p>
   <p class="sub" id="scoremsg"></p>
+  <p id="waitmsg"></p>
+  <button class="pill hidden" id="watchnext">👀 Watch someone else</button>
   <button class="btn" id="again">▶ Play again</button>
   <button class="pill" id="tomenu">Change hero</button>
 </div>

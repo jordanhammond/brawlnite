@@ -24,6 +24,7 @@ A battle royale game for the browser, built by Jordan and the boys.
 | [12-wins-and-unlocks.md](12-wins-and-unlocks.md) | Win tracking and unlockable heroes |
 | [13-players.md](13-players.md) | Player names, profiles, change player |
 | [14-online-and-high-scores.md](14-online-and-high-scores.md) | Cloudflare hosting, high score lists, name filter |
+| [15-multiplayer.md](15-multiplayer.md) | Playing with friends: room codes, lobby, host + guests |
 
 ## Art references
 

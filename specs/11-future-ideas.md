@@ -2,7 +2,8 @@
 
 Not in version 1. Add the boys' ideas here as they come up.
 
-- 🎮 **Multiplayer:** split screen on one Chromebook, or each player on their own device over Wi-Fi
+- 🎮 **Split screen** on one Chromebook (online multiplayer is in 15)
+- 🔁 **Host hand-over:** if the host leaves, another player takes over instead of the match ending
 - 🗺️ **More maps:** Block Island, Candy Land, ...
 - 🦸 **More heroes:** the boys design them (same format as 03-heroes)
 - 🌋 **Volcano eruptions:** lava bombs rain down at random

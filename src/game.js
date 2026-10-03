@@ -2116,23 +2116,30 @@ let state = 'menu';   // menu | play | paused | ending | end
 let locked = false;
 
 const canvas = renderer.domElement;
-const requestLock = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* not supported */ } };
+const requestLock = () => { if (touchMode) return; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* not supported */ } };
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (!locked && state === 'play') pause();
+  if (!locked && state === 'play' && !touchMode) pause();
 });
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return; // typing a name
+  setTouchMode(false);
   keys[e.code] = true;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (state !== 'play' || !player || !player.alive) return;
-  if (e.code === 'KeyE') { // a guest shows its own super straight away; the host makes it count
-    if (useSuper(player, player.yaw) && !auth) player.supLock = T + 0.6;
-    if (net && !net.host) { net.su++; sendInput(); }
-  }
-  if (e.code === 'Space' && player.y === 0) { player.vy = 9; if (net && !net.host) { net.ju++; sendInput(); } }
+  if (e.code === 'KeyE') doSuper();
+  if (e.code === 'Space') doJump();
   if (e.code === 'Escape' && !locked) pause();
 });
+function doSuper() { // a guest shows its own super straight away; the host makes it count
+  if (useSuper(player, player.yaw) && !auth) player.supLock = T + 0.6;
+  if (net && !net.host) { net.su++; sendInput(); }
+}
+function doJump() {
+  if (player.y !== 0) return;
+  player.vy = 9;
+  if (net && !net.host) { net.ju++; sendInput(); }
+}
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouseDown = false; });
 document.addEventListener('mousemove', (e) => {
@@ -2141,11 +2148,129 @@ document.addEventListener('mousemove', (e) => {
   camPitch = clamp(camPitch + e.movementY * 0.002, -0.05, 0.6);
 });
 canvas.addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || touchMode) return;
   mouseDown = true;
   if (state === 'play' && !locked) requestLock();
 });
 window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
+
+// ===================================================================
+// Touch controls for phones and tablets (specs/08-controls-and-hud.md)
+// ===================================================================
+let touchMode = false;
+const stick = { id: null, ox: 0, oy: 0, f: 0, s: 0 };   // left thumb joystick
+const aims = new Map();                                 // fingers turning the hero: pointerId -> last x, y
+let fireId = null;
+const STICK_R = 60;
+
+function setTouchMode(on) {
+  if (on === touchMode) return;
+  touchMode = on;
+  document.body.classList.toggle('touch', on);
+  if (on && document.pointerLockElement) document.exitPointerLock();
+  if (!on) releaseTouches();
+  $('resume').textContent = on ? '▶ Tap to resume' : '▶ Click to resume';
+  checkOrientation();
+}
+function releaseTouches() {
+  stick.id = null; stick.f = stick.s = 0;
+  aims.clear();
+  if (fireId !== null) { fireId = null; mouseDown = false; }
+  $('stick').classList.remove('held');
+  for (const b of document.querySelectorAll('.tbtn')) b.classList.remove('down');
+}
+// the first touch anywhere switches touch controls on; moving a real mouse switches them off
+window.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || touchMode) return;
+  setTouchMode(true);
+  if (state === 'play') padDown(e); // the touch pad wasn't showing yet, so pass this first touch on to it
+}, true);
+window.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse' && (e.movementX || e.movementY)) setTouchMode(false); });
+
+function moveStick(x, y) {
+  let dx = x - stick.ox, dy = y - stick.oy;
+  const d = Math.hypot(dx, dy);
+  if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+  $('knob').style.transform = `translate(${dx}px, ${dy}px)`;
+  const m = Math.min(1, d / (STICK_R * 0.85));                 // full speed near the edge
+  const a = d > STICK_R * 0.15 ? m / (d || 1) : 0;             // small dead zone in the middle
+  stick.s = (x - stick.ox) * a; stick.f = -(y - stick.oy) * a;
+}
+function turnBy(dx, dy) {
+  if (!player || state !== 'play') return;
+  player.yaw -= dx * 0.006;
+  camPitch = clamp(camPitch + dy * 0.004, -0.05, 0.6);
+}
+
+function padDown(e) {
+  e.preventDefault();
+  if (state !== 'play' || !player) return;
+  const btn = e.target.closest('.tbtn');
+  if (btn) {
+    btn.classList.add('down');
+    if (btn.id === 'tpause') { releaseTouches(); pause(); return; }
+    if (!player.alive) return;
+    if (btn.id === 'tsuper') doSuper();
+    if (btn.id === 'tjump') doJump();
+    if (btn.id === 'tfire') { fireId = e.pointerId; mouseDown = true; aims.set(e.pointerId, [e.clientX, e.clientY]); }
+    try { btn.setPointerCapture(e.pointerId); } catch (err) { /* old browser */ }
+    return;
+  }
+  if (e.clientX < window.innerWidth / 2) {
+    if (stick.id !== null) return;
+    stick.id = e.pointerId; stick.ox = e.clientX; stick.oy = e.clientY; stick.f = stick.s = 0;
+    const el = $('stick');
+    el.style.left = `${e.clientX}px`; el.style.top = `${e.clientY}px`; el.style.bottom = 'auto';
+    el.classList.add('held');
+    $('knob').style.transform = '';
+  } else aims.set(e.pointerId, [e.clientX, e.clientY]);
+  try { $('touch').setPointerCapture(e.pointerId); } catch (err) { /* old browser */ }
+}
+function buildTouch() {
+  const pad = $('touch');
+  pad.addEventListener('contextmenu', (e) => e.preventDefault());
+  pad.addEventListener('pointerdown', padDown);
+  const move = (e) => {
+    if (e.pointerId === stick.id) { moveStick(e.clientX, e.clientY); return; }
+    const last = aims.get(e.pointerId);
+    if (!last) return;
+    turnBy(e.clientX - last[0], e.clientY - last[1]);
+    last[0] = e.clientX; last[1] = e.clientY;
+  };
+  const up = (e) => {
+    const btn = e.target.closest && e.target.closest('.tbtn');
+    if (btn) btn.classList.remove('down');
+    if (e.pointerId === stick.id) {
+      stick.id = null; stick.f = stick.s = 0;
+      const el = $('stick');
+      el.classList.remove('held'); el.style.left = el.style.top = el.style.bottom = '';
+      $('knob').style.transform = '';
+    }
+    if (e.pointerId === fireId) { fireId = null; mouseDown = false; $('tfire').classList.remove('down'); }
+    aims.delete(e.pointerId);
+  };
+  // on the window, so a finger is still followed if it slides off the pad
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+// phones and tablets play sideways only
+function checkOrientation() {
+  const upright = touchMode && window.innerHeight > window.innerWidth;
+  $('rotate').classList.toggle('hidden', !upright);
+  if (upright && state === 'play') { releaseTouches(); pause(); }
+}
+window.addEventListener('resize', checkOrientation);
+// at the start of a touch match: go fullscreen and lock sideways where the browser allows it (iPhones don't)
+function goFullscreen() {
+  if (!touchMode) return;
+  try {
+    const el = document.documentElement;
+    const p = !document.fullscreenElement && el.requestFullscreen && el.requestFullscreen({ navigationUI: 'hide' });
+    Promise.resolve(p).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+  } catch (e) { /* not supported */ }
+}
 
 const boomerAimDist = () => clamp(18 - (camPitch - 0.05) * 25, 5, 18);
 
@@ -2159,10 +2284,11 @@ function playerInput(dt) {
   if (keys.KeyS || keys.ArrowDown) f -= 1;
   if (keys.KeyD) s += 1;
   if (keys.KeyA) s -= 1;
+  if (stick.id !== null) { f += stick.f; s += stick.s; }
   const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw), rx = -fz, rz = fx;
   let mx = fx * f + rx * s, mz = fz * f + rz * s;
-  const l = Math.hypot(mx, mz);
-  h.mx = l ? mx / l : 0; h.mz = l ? mz / l : 0;
+  const l = Math.hypot(mx, mz), k = l > 1 ? 1 / l : 1; // the joystick can go slower than full speed
+  h.mx = mx * k; h.mz = mz * k;
   if (h.fearUntil > T) { // scared by Boo: run away, no attacking
     const dx = h.x - h.fearX, dz = h.z - h.fearZ, d = Math.hypot(dx, dz) || 1;
     h.mx = dx / d; h.mz = dz / d;
@@ -2282,8 +2408,9 @@ function updateHUD(dt) {
   setText($('hptxt'), `${Math.ceil(Math.max(0, h.hp))} / ${h.maxHp}`);
   $('superfill').style.transform = `scaleX(${h.superCharge / 100})`;
   const ready = h.superCharge >= 100;
-  setText($('supertxt'), h.lasering ? '🍃 LEAF LASER!' : h.shielded ? '🧱 BRICK FORT!' : ready ? '⭐ SUPER READY: press E' : `Super ${Math.floor(h.superCharge)}%`);
+  setText($('supertxt'), h.lasering ? '🍃 LEAF LASER!' : h.shielded ? '🧱 BRICK FORT!' : ready ? (touchMode ? '⭐ SUPER READY: tap ⭐' : '⭐ SUPER READY: press E') : `Super ${Math.floor(h.superCharge)}%`);
   $('superbar').classList.toggle('ready', ready);
+  $('tsuper').classList.toggle('ready', ready && h.alive);
   setText($('heroname'), `${playerName} · ${h.def.emoji} ${h.def.name}`);
   const fx = [['strength', '💪'], ['speed', '⚡'], ['invis', '🧥']].filter(([k]) => h.has(k)).map(([k, ic]) => `<span class="fx">${ic} ${Math.ceil(h.fx[k] - T)}</span>`).join('');
   if ($('effects')._v !== fx) { $('effects')._v = fx; $('effects').innerHTML = fx; }
@@ -2483,7 +2610,9 @@ function beginMatch(setup) {
   $('hud').classList.remove('hidden');
   state = 'play';
   requestLock();
-  popup(auth ? `🌋 Good luck, ${playerName}!` : `🌋 Good luck, ${playerName}! Click to aim`);
+  goFullscreen();
+  checkOrientation();
+  popup(auth || touchMode ? `🌋 Good luck, ${playerName}!` : `🌋 Good luck, ${playerName}! Click to aim`);
 }
 const PICKUP_KEYS = Object.keys(PICKUP_TYPES);
 const pickupList = () => pickups.map((p) => [PICKUP_KEYS.indexOf(p.type), r2(p.x), r2(p.z), p.active ? 1 : 0, p.temp ? 1 : 0]);
@@ -2504,6 +2633,7 @@ function syncPickups(list) {
 function pause() {
   if (state !== 'play') return;
   state = 'paused'; mouseDown = false;
+  releaseTouches();
   // online there's no pausing: the match keeps going behind this menu
   $('pause').classList.toggle('online', !!net);
   $('pausetitle').textContent = net ? 'MENU' : 'PAUSED';
@@ -2512,9 +2642,11 @@ function pause() {
   $('pause').classList.remove('hidden');
 }
 function resume() {
+  if (touchMode && window.innerHeight > window.innerWidth) return; // turn sideways first
   $('pause').classList.add('hidden');
   state = 'play';
   requestLock();
+  goFullscreen();
 }
 function showLogin() {
   showMenu();
@@ -2565,6 +2697,7 @@ function checkEnd(dead, place) {
 function endMatch(won, place) {
   if (state !== 'play' && state !== 'paused') return;
   state = 'ending'; mouseDown = false;
+  releaseTouches();
   if (won) startDance(player);
   save.games++; save.elims += player.kills;
   if (won) save.wins++;
@@ -3155,6 +3288,7 @@ buildMap();
 buildSmoke();
 buildEmbers();
 buildMenu();
+buildTouch();
 updateStorm(0);
 requestAnimationFrame(frame);
 

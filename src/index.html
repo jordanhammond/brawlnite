@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>BrawlNite</title>
 <style>
   :root {
@@ -17,8 +17,9 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-    font-family: "Trebuchet MS", system-ui, sans-serif; user-select: none; }
-  #game { position: fixed; inset: 0; }
+    font-family: "Trebuchet MS", system-ui, sans-serif; user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  #game { position: fixed; inset: 0; touch-action: none; }
   #game canvas { display: block; }
   .hidden { display: none !important; }
 
@@ -143,6 +144,47 @@
   #joinmsg, #waitmsg { min-height: 22px; margin: 0; color: var(--accent2); font-weight: 700; font-size: 18px; }
   #waitmsg:empty { display: none; }
   .btn:disabled { opacity: 0.6; cursor: wait; }
+  /* ---------- touch controls (specs/08-controls-and-hud.md) ---------- */
+  #touch { display: none; position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+  body.touch #touch { display: block; }
+  #hud.dancing #touch, #hud.watching #touch { display: none; }
+  #stick { position: absolute; left: 90px; bottom: 90px; top: auto; width: 120px; height: 120px; margin: -60px 0 0 -60px;
+    border-radius: 50%; background: rgba(0,0,0,0.25); border: 3px solid rgba(255,255,255,0.35); opacity: 0.55; }
+  #stick:not(.held) { margin: 0 0 -60px -60px; }
+  #stick.held { opacity: 1; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+    background: rgba(255,255,255,0.55); border: 2px solid rgba(255,255,255,0.85); }
+  .tbtn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    width: 72px; height: 72px; font-size: 30px; background: rgba(0,0,0,0.35); border: 3px solid rgba(255,255,255,0.45);
+    text-shadow: 0 2px 3px #000; }
+  .tbtn.down { background: rgba(255,255,255,0.35); transform: scale(0.94); }
+  #tfire { right: 28px; bottom: 28px; width: 96px; height: 96px; font-size: 42px; background: rgba(255,122,26,0.4); }
+  #tjump { right: 140px; bottom: 22px; }
+  #tsuper { right: 40px; bottom: 140px; opacity: 0.45; filter: grayscale(1); }
+  #tsuper.ready { opacity: 1; filter: none; border-color: var(--accent2); animation: pulse .6s infinite alternate; }
+  #tpause { left: 50%; top: 64px; transform: translateX(-50%); width: 52px; height: 52px; font-size: 22px; }
+  #tpause.down { transform: translateX(-50%) scale(0.94); }
+  body.touch #bottom { width: min(360px, 42vw); bottom: 10px; }
+  body.touch #effects { bottom: 74px; }
+  body.touch #crosshair { top: 50%; }
+  @media (max-height: 500px) {
+    body.touch #minimap { width: 110px; height: 110px; }
+    body.touch #feed { font-size: 12px; }
+  }
+  @media (min-height: 600px) { /* tablets: bigger and further apart */
+    body.touch .tbtn { width: 86px; height: 86px; font-size: 36px; }
+    body.touch #tfire { right: 40px; bottom: 40px; width: 116px; height: 116px; font-size: 50px; }
+    body.touch #tjump { right: 180px; bottom: 30px; }
+    body.touch #tsuper { right: 55px; bottom: 185px; }
+    body.touch #tpause { width: 60px; height: 60px; font-size: 26px; }
+    body.touch #stick { left: 120px; bottom: 120px; }
+  }
+  .touchhelp, body.touch .keyhelp { display: none; }
+  body.touch .touchhelp { display: inline; }
+  #rotate { z-index: 30; text-align: center; background: var(--bg); }
+  #rotate h1 { font-size: clamp(30px, 9vw, 44px) !important; }
+  #rotate .icon { font-size: 90px; animation: tilt 1.6s ease-in-out infinite; }
+  @keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
   #redflash { position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(255,0,0,0.0); transition: box-shadow .15s; }
 </style>
 </head>
@@ -167,6 +209,19 @@
     <div class="bigbar"><i id="hpfill"></i><b id="hptxt"></b></div>
     <div class="bigbar" id="superbar"><i id="superfill"></i><b id="supertxt"></b></div>
   </div>
+  <div id="touch">
+    <div id="stick"><div id="knob"></div></div>
+    <div class="tbtn" id="tfire">🔥</div>
+    <div class="tbtn" id="tjump">⬆</div>
+    <div class="tbtn" id="tsuper">⭐</div>
+    <div class="tbtn" id="tpause">⏸</div>
+  </div>
+</div>
+
+<div id="rotate" class="screen hidden">
+  <div class="icon">📱</div>
+  <h1 class="logo" style="font-size:40px">🔄 Turn your device sideways</h1>
+  <p class="sub">BrawlNite plays in landscape.</p>
 </div>
 
 <div id="menu" class="screen">
@@ -191,8 +246,9 @@
   <button class="btn" id="play">▶ PLAY</button>
   <div class="cards" id="cards"></div>
   <div class="help">
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>Mouse</b> aim (or <kbd>←</kbd><kbd>→</kbd>) ·
-    <b>Click</b> attack · <kbd>E</kbd> super · <kbd>Space</kbd> jump · <kbd>Esc</kbd> pause<br>
+    <span class="keyhelp"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>Mouse</b> aim (or <kbd>←</kbd><kbd>→</kbd>) ·
+    <b>Click</b> attack · <kbd>E</kbd> super · <kbd>Space</kbd> jump · <kbd>Esc</kbd> pause</span>
+    <span class="touchhelp">🕹️ <b>Left thumb</b> move · 👆 <b>Drag right side</b> aim · 🔥 attack · ⭐ super · ⬆ jump · ⏸ pause</span><br>
     Pickups: 💪 strength · ⚡ speed · 🩹 health · 🧥 invisibility &nbsp;|&nbsp; Avoid the lava and the purple storm!
   </div>
 </div>

@@ -28,7 +28,7 @@
 - 🔧 It fills mainly by **dealing damage** with the main attack
 - 🔧 It also fills slowly on its own (+2% per second)
 - 🔧 Damage dealt by a super does **not** charge the super
-- 🔧 Press **E** when the meter is full. It resets to 0 after use.
+- 🔧 Press **E** (or tap **⭐ Super** on touch) when the meter is full. It resets to 0 after use.
 - 🔧 A full meter glows and pulses on the HUD
 
 ## Feedback

@@ -9,7 +9,7 @@
    - 8 hero cards: emoji, name, HP/speed/range bars, attack and super text. Locked ones are greyed out with 🔒.
    - Click a card to select it (it gets a gold outline)
    - A controls cheat sheet at the bottom
-2. **Pause** (Esc, or when the mouse unlocks): Resume / Quit to menu
+2. **Pause** (Esc, the ⏸ button on touch, or when the mouse unlocks): Resume / Quit to menu
 3. **End**
    - Win: ✅ "🏆 YOU WON!" plus "Last one standing!"
    - Lose: "ELIMINATED" plus "You placed #4 · 2 eliminations"

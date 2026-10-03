@@ -38,8 +38,16 @@ bloknite/
 ## Performance budget (Chromebook Plus) 🔧
 - Low-poly meshes, flat colours, and a few canvas-drawn textures
 - No real-time shadows. Each hero gets a cheap dark "blob" shadow instead.
-- Particles come from a reused pool, capped at about 600
+- Particles come from a reused pool, capped at about 700
 - Frame time is capped (dt ≤ 0.05 s) so a lag spike doesn't break the physics
+
+### Fewer draw calls (GitHub issue #1: stutters on the Chromebook) 🔧
+Measured 2026-10-03: game code takes under 1 ms a frame, but the graphics chip was asked to draw 400–850 separate pieces a frame (about 1,600 in the scene). That's what causes the stutters in busy fights.
+- **Map scenery is merged** after it's built: all rocks, towers, crates, torches, mountains and clouds that share a material become one mesh (about 450 pieces → about 25)
+- **Particles are drawn as one batch** (an instanced mesh for cubes and one for leaves) instead of up to 700 separate pieces
+- **Each hero's body parts are merged** per limb (parts that move together become one piece, with each part's colour stored in the shape), keeping animation, hit flash and invisibility working
+- **Auto quality:** if frames are slow for a couple of seconds, the game lowers its drawing resolution a step (down to 70%). It goes back up when there's room again.
+- ✅ Result (headless test, same match): pieces in the scene 1,586 → 262; draw calls per frame median 395 → 162, busiest frame 855 → 210
 
 ## Code structure (game.js) 🔧
 - `HEROES`: data for the 4 heroes (stats, colours, attack and super settings)

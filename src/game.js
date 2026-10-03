@@ -132,7 +132,8 @@ const LEAF_COLORS = [0x2e8b2e, 0x3fa33f, 0x57c13a, 0x7ed957, 0x1f6e2a];
 // Renderer, scene, camera
 // ===================================================================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+const BASE_RATIO = Math.min(window.devicePixelRatio || 1, 1.5);
+renderer.setPixelRatio(BASE_RATIO);
 renderer.setSize(window.innerWidth, window.innerHeight);
 $('game').appendChild(renderer.domElement);
 
@@ -287,6 +288,7 @@ const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ colo
 const lavaMat = basic(0xffffff, { map: lavaTex });
 
 function buildMap() {
+  const first = scene.children.length;
   // island
   const islandMats = [lambert(0x3e3340), lambert(0xffffff, { map: groundTex }), lambert(0x2a2228)];
   const island = new THREE.Mesh(new THREE.CylinderGeometry(ISLAND_R + 2, ISLAND_R + 8, 8, 72), islandMats);
@@ -452,6 +454,7 @@ function buildMap() {
     const ring = new THREE.Mesh(padRingGeo, padRingMat.clone()); ring.rotation.x = -Math.PI / 2; g.add(ring);
     pads.push({ x: p.x, z: p.z, ring, top });
   }
+  mergeMap(scene.children.slice(first), new Set([...pads.map((p) => p.ring.parent), ...torches]));
 }
 const torches = [];
 const pads = [];  // {x, z, ring, top}
@@ -536,23 +539,39 @@ const inLava = (x, z) => lavaPools.some((l) => dist(x, z, l.x, l.z) < l.r - 0.3)
 // ===================================================================
 // Particles (one reused pool)
 // ===================================================================
+// particles are drawn in two batches (cubes and leaves), not one draw call each (specs/10-tech.md)
 const PMAX = 700;
 const pGeo = new THREE.BoxGeometry(1, 1, 1);
 const leafGeo = new THREE.BoxGeometry(1, 0.18, 0.6);
-const pMats = {};
-const pMat = (c) => pMats[c] || (pMats[c] = basic(c));
-const particles = [];
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+const pColor = new THREE.Color(), pObj = new THREE.Object3D();
+function particleBatch(geo) {
+  const m = new THREE.InstancedMesh(geo, basic(0xffffff), PMAX);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  m.frustumCulled = false;
+  for (let i = 0; i < PMAX; i++) { m.setMatrixAt(i, HIDDEN); m.setColorAt(i, pColor.setHex(0xffffff)); }
+  scene.add(m);
+  return m;
+}
+const pBox = particleBatch(pGeo), pLeaf = particleBatch(leafGeo);
+const particles = Array.from({ length: PMAX }, () => ({ life: 0, mesh: pBox }));
 let pIdx = 0;
-for (let i = 0; i < PMAX; i++) {
-  const m = new THREE.Mesh(pGeo, pMat(0xffffff)); m.visible = false; scene.add(m);
-  particles.push({ m, life: 0 });
+function placeP(i, p) {
+  pObj.position.set(p.x, p.y, p.z); pObj.rotation.set(p.rx, p.ry, p.rz);
+  pObj.scale.setScalar(p.size * Math.sqrt(p.life / p.max));
+  pObj.updateMatrix();
+  p.mesh.setMatrixAt(i, pObj.matrix);
+  p.mesh.instanceMatrix.needsUpdate = true;
 }
 function spawnP(x, y, z, vx, vy, vz, color, size, life, grav = 0, leaf = false) {
-  const p = particles[pIdx]; pIdx = (pIdx + 1) % PMAX;
-  p.m.geometry = leaf ? leafGeo : pGeo; p.m.material = pMat(color); p.m.visible = true;
-  p.m.position.set(x, y, z); p.m.rotation.set(Math.random() * TAU, Math.random() * TAU, 0);
+  const i = pIdx, p = particles[i]; pIdx = (pIdx + 1) % PMAX;
+  const mesh = leaf ? pLeaf : pBox;
+  if (p.life > 0 && p.mesh !== mesh) p.mesh.setMatrixAt(i, HIDDEN);
+  p.mesh = mesh;
+  mesh.setColorAt(i, pColor.setHex(color)); mesh.instanceColor.needsUpdate = true;
+  p.x = x; p.y = y; p.z = z; p.rx = Math.random() * TAU; p.ry = Math.random() * TAU; p.rz = 0;
   p.vx = vx; p.vy = vy; p.vz = vz; p.life = p.max = life; p.grav = grav; p.size = size; p.spin = rand(-8, 8);
-  p.m.scale.setScalar(size);
+  placeP(i, p);
 }
 function burst(x, y, z, n, colors, speed, size, life, grav = 10, leaf = false) {
   for (let i = 0; i < n; i++) {
@@ -561,15 +580,88 @@ function burst(x, y, z, n, colors, speed, size, life, grav = 10, leaf = false) {
   }
 }
 function updateParticles(dt) {
-  for (const p of particles) {
+  for (let i = 0; i < PMAX; i++) {
+    const p = particles[i];
     if (p.life <= 0) continue;
     p.life -= dt;
-    if (p.life <= 0) { p.m.visible = false; continue; }
+    if (p.life <= 0) { p.mesh.setMatrixAt(i, HIDDEN); p.mesh.instanceMatrix.needsUpdate = true; continue; }
     p.vy -= p.grav * dt;
-    p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
-    if (p.m.position.y < 0.05 && p.grav > 0) { p.m.position.y = 0.05; p.vy = 0; p.vx *= 0.85; p.vz *= 0.85; }
-    p.m.rotation.x += p.spin * dt; p.m.rotation.z += p.spin * 0.5 * dt;
-    p.m.scale.setScalar(p.size * Math.sqrt(p.life / p.max));
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    if (p.y < 0.05 && p.grav > 0) { p.y = 0.05; p.vy = 0; p.vx *= 0.85; p.vz *= 0.85; }
+    p.rx += p.spin * dt; p.rz += p.spin * 0.5 * dt;
+    placeP(i, p);
+  }
+}
+function clearParticles() {
+  particles.forEach((p, i) => { if (p.life > 0) p.mesh.setMatrixAt(i, HIDDEN); p.life = 0; });
+  pBox.instanceMatrix.needsUpdate = pLeaf.instanceMatrix.needsUpdate = true;
+}
+
+// Merge meshes into one, so the graphics chip draws them in one go. Each item is { mesh, matrix }:
+// the matrix places the mesh's geometry in the merged mesh's space. With `colors`, each part's
+// material colour is stored in the geometry, so parts of different colours can share one material.
+function mergeGeometry(items, colors) {
+  const parts = items.map((it) => (it.mesh.geometry.index ? it.mesh.geometry.toNonIndexed() : it.mesh.geometry.clone()).applyMatrix4(it.matrix));
+  const count = parts.reduce((n, g) => n + g.attributes.position.count, 0);
+  const geo = new THREE.BufferGeometry();
+  for (const [name, size] of [['position', 3], ['normal', 3], ['uv', 2]]) {
+    const arr = new Float32Array(count * size);
+    let off = 0;
+    for (const g of parts) { arr.set(g.attributes[name].array, off); off += g.attributes[name].array.length; }
+    geo.setAttribute(name, new THREE.BufferAttribute(arr, size));
+  }
+  if (colors) {
+    const arr = new Float32Array(count * 3);
+    let off = 0;
+    parts.forEach((g, i) => {
+      const c = items[i].mesh.material.color;
+      for (let k = 0; k < g.attributes.position.count; k++) { arr[off++] = c.r; arr[off++] = c.g; arr[off++] = c.b; }
+    });
+    geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  }
+  geo.computeBoundingSphere();
+  for (const it of items) it.mesh.parent.remove(it.mesh);
+  return geo;
+}
+const mergeable = (m) => m.isMesh && !Array.isArray(m.material) && m.geometry.attributes.normal && m.geometry.attributes.uv;
+function mergeByMaterial(items) {
+  const byMat = new Map();
+  for (const it of items) {
+    if (!mergeable(it.mesh)) continue;
+    if (!byMat.has(it.mesh.material)) byMat.set(it.mesh.material, []);
+    byMat.get(it.mesh.material).push(it);
+  }
+  const out = [];
+  for (const [mat, list] of byMat) if (list.length > 1) out.push(new THREE.Mesh(mergeGeometry(list), mat));
+  return out;
+}
+// map scenery never moves: merge it all (except the launch pads and torch flames, which animate)
+function mergeMap(objects, keep) {
+  scene.updateMatrixWorld(true);
+  const items = [];
+  for (const o of objects) {
+    if (keep.has(o)) continue;
+    o.traverse((m) => { if (m.isMesh) items.push({ mesh: m, matrix: m.matrixWorld.clone() }); });
+  }
+  for (const m of mergeByMaterial(items)) scene.add(m);
+  for (const o of objects) {
+    let left = false;
+    o.traverse((m) => { if (m.isMesh) left = true; });
+    if (!left && o.parent) o.parent.remove(o);
+  }
+}
+// a hero's parts that move together (same limb) become one mesh: one lit and one unlit (eyes, glows)
+function mergeHero(h, skip) {
+  const groups = [];
+  h.root.traverse((o) => { if (o.isGroup) groups.push(o); });
+  const mats = {};
+  const mat = (unlit) => mats[unlit] || (mats[unlit] = heroMat(h, 0xffffff, unlit, true));
+  for (const g of groups) {
+    const items = g.children.filter((c) => mergeable(c) && !c.children.length && !skip.includes(c)).map((c) => { c.updateMatrix(); return { mesh: c, matrix: c.matrix }; });
+    for (const unlit of [false, true]) {
+      const list = items.filter((it) => !!it.mesh.material.isMeshBasicMaterial === unlit);
+      if (list.length > 1) g.add(new THREE.Mesh(mergeGeometry(list, true), mat(unlit)));
+    }
   }
 }
 
@@ -652,9 +744,9 @@ function sfx(name, x, z) {
 // ===================================================================
 // Hero models (specs/03-heroes.md, art/heroes/)
 // ===================================================================
-function heroMat(h, color, isBasic) {
-  const key = color + (isBasic ? 'b' : 'l');
-  if (!h.matCache[key]) { const m = isBasic ? basic(color) : lambert(color); h.matCache[key] = m; h.mats.push(m); }
+function heroMat(h, color, isBasic, vertexColors = false) {
+  const key = color + (isBasic ? 'b' : 'l') + (vertexColors ? 'v' : '');
+  if (!h.matCache[key]) { const o = { vertexColors }; const m = isBasic ? basic(color, o) : lambert(color, o); h.matCache[key] = m; h.mats.push(m); }
   return h.matCache[key];
 }
 function addBox(h, parent, w, ht, d, color, x, y, z, o = {}) {
@@ -955,6 +1047,7 @@ class Hero {
     this.mats = []; this.matCache = {};
     this.root = new THREE.Group(); scene.add(this.root);
     this.rig = MODELS[key](this);
+    mergeHero(this, [this.rig.mouth, this.rig.scarf]);
     this.rig.body.scale.setScalar(this.def.scale);
     this.blob = new THREE.Mesh(blobGeo, blobMat); this.blob.rotation.x = -Math.PI / 2; this.blob.position.y = 0.06;
     this.blob.scale.setScalar(this.def.radius * 1.1); this.root.add(this.blob);
@@ -2328,7 +2421,7 @@ function clearMatch() {
   holes = [];
   inkT = 0; $('ink').style.opacity = 0;
   bannerShown = new Set(); $('banner').classList.remove('show'); $('hud').classList.remove('dancing');
-  for (const p of particles) { p.life = 0; p.m.visible = false; }
+  clearParticles();
   for (const f of floats) f.el.remove();
   floats.length = 0;
   $('tags').innerHTML = ''; $('feed').innerHTML = '';
@@ -3016,10 +3109,28 @@ function simulate(dt) {
   if (net) { netTick(dt); updateWatch(); }
 }
 
+// auto quality (specs/10-tech.md): draw at a lower resolution while frames are slow, back up when there's room
+let quality = 1, frameAvg = 1 / 60, qualityCd = 3;
+function autoQuality(realDt) {
+  if (document.hidden || realDt > 0.25) return; // tab switches aren't slow frames
+  frameAvg = lerp(frameAvg, realDt, 0.05);
+  qualityCd -= realDt;
+  if (qualityCd > 0) return;
+  let q = quality;
+  if (frameAvg > 1 / 42 && quality > 0.7) q = quality - 0.1;
+  else if (frameAvg < 1 / 57 && quality < 1) q = quality + 0.1;
+  if (q === quality) return;
+  qualityCd = q < quality ? 3 : 8; // be slow to go back up, so it doesn't flip back and forth
+  quality = Math.round(q * 10) / 10;
+  renderer.setPixelRatio(BASE_RATIO * quality);
+  frameAvg = 1 / 60;
+}
+
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = clamp((now - last) / 1000, 0, 0.05);
+  autoQuality((now - last) / 1000);
   last = now; lastFrameAt = now;
 
   lavaTex.offset.x += dt * 0.03; lavaTex.offset.y += dt * 0.015;
@@ -3052,5 +3163,5 @@ const auto = new URLSearchParams(location.search).get('auto');
 if (auto && HEROES[auto]) { if (!playerName) playerName = 'Tester'; chosenHero = auto; startMatch(); }
 else if (!playerName) showLogin();
 else if (pendingRoom) { const code = pendingRoom; pendingRoom = null; showJoin(code); joinRoom(code); }
-window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, damage, storm, simulate, get T() { return T; }, pads, get net() { return net; }, get watch() { return watch; } };
+window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, damage, storm, simulate, get T() { return T; }, pads, get net() { return net; }, get quality() { return quality; }, get watch() { return watch; } };
 })();

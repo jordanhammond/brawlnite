@@ -268,6 +268,7 @@ const mr = (a, b) => a + mrand() * (b - a);
 function isFree(x, z, clear) {
   for (const c of colliders) if (dist(x, z, c.x, c.z) < c.r + clear) return false;
   for (const l of lavaPools) if (dist(x, z, l.x, l.z) < l.r + clear) return false;
+  for (const p of pads) if (dist(x, z, p.x, p.z) < PAD_R + 1 + clear) return false;
   return true;
 }
 function freeSpot(minR, maxR, clear, rng = Math.random, cx = 0, cz = 0) {
@@ -439,8 +440,52 @@ function buildMap() {
     const flame = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.6, 0.4), flameMat); flame.position.set(p.x, 2.95, p.z); flame.rotation.y = 0.7; scene.add(flame);
     torches.push(flame);
   }
+
+  // launch pads (specs/05-map-lava-volcano.md)
+  for (const [minR, maxR] of [[20, 28], [20, 28], [20, 28], [45, 72], [45, 72], [45, 72]]) {
+    let p;
+    for (let k = 0; k < 40; k++) { p = freeSpot(minR, maxR, 3, mrand); if (pads.every((o) => dist(p.x, p.z, o.x, o.z) > 18) && torches.every((f) => dist(p.x, p.z, f.position.x, f.position.z) > 3.5)) break; }
+    const g = new THREE.Group(); g.position.set(p.x, 0, p.z); scene.add(g);
+    const base = new THREE.Mesh(padBaseGeo, padBaseMat); base.position.y = 0.15; g.add(base);
+    const top = new THREE.Mesh(padTopGeo, padTopMat); top.rotation.x = -Math.PI / 2; top.position.y = 0.32; g.add(top);
+    const ring = new THREE.Mesh(padRingGeo, padRingMat.clone()); ring.rotation.x = -Math.PI / 2; g.add(ring);
+    pads.push({ x: p.x, z: p.z, ring, top });
+  }
 }
 const torches = [];
+const pads = [];  // {x, z, ring, top}
+const PAD_R = 1.8;
+const padBaseGeo = new THREE.CylinderGeometry(2.1, 2.3, 0.3, 24);
+const padBaseMat = lambert(0x3a3f4a);
+const padTopGeo = new THREE.CircleGeometry(1.8, 24);
+const padTopMat = basic(0xffffff, { map: canvasTex(128, 128, (g, w) => {
+  const c = w / 2;
+  g.fillStyle = '#19d3ff'; g.beginPath(); g.arc(c, c, c, 0, TAU); g.fill();
+  g.fillStyle = '#8ff3ff'; g.beginPath(); g.arc(c, c, c * 0.8, 0, TAU); g.fill();
+  g.fillStyle = '#ffffff'; g.beginPath();
+  g.moveTo(c, 18); g.lineTo(c + 34, c + 2); g.lineTo(c + 14, c + 2); g.lineTo(c + 14, w - 22);
+  g.lineTo(c - 14, w - 22); g.lineTo(c - 14, c + 2); g.lineTo(c - 34, c + 2); g.closePath(); g.fill();
+}) });
+const padRingGeo = new THREE.RingGeometry(1.6, 2.0, 32);
+const padRingMat = basic(0x5ff6ff, { transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
+function updatePadFx(now) {
+  for (const [i, p] of pads.entries()) {
+    const t = ((now * 0.0012) + i * 0.37) % 1;
+    p.ring.position.y = 0.35 + t * 2.5; p.ring.scale.setScalar(1 - t * 0.35); p.ring.material.opacity = 0.8 * (1 - t);
+  }
+}
+function updatePads(h) {
+  if (!h.alive || h.y > 0 || h.vy > 0 || h.dance || h.padCd > T) return;
+  for (const p of pads) {
+    if (dist(h.x, h.z, p.x, p.z) > PAD_R) continue;
+    h.vy = 24; h.lvx = Math.sin(h.yaw) * 17; h.lvz = Math.cos(h.yaw) * 17;
+    h.launched = true; h.padCd = T + 1;
+    burst(p.x, 0.5, p.z, 22, [0x5ff6ff, 0xffffff, 0x19d3ff], 9, 0.3, 0.5, 4);
+    sfx('boing', p.x, p.z);
+    if (h.isPlayer) shake = Math.max(shake, 0.3);
+    return;
+  }
+}
 
 // smoke plume rising from the volcano
 const smoke = [];
@@ -590,6 +635,7 @@ const SFX = {
   splat: () => noise(0.25, 0.15, 600),
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'square', 0.06, null, i * 0.15)),
   lose: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.35, 'triangle', 0.08, null, i * 0.18)),
+  boing: (v) => { tone(180, 0.35, 'sine', 0.14 * v, 900); noise(0.35, 0.08 * v, 3000); },
   alert: () => [880, 880, 1175].forEach((f, i) => tone(f, 0.14, 'square', 0.05, null, i * 0.13)),
 };
 function sfx(name, x, z) {
@@ -911,6 +957,7 @@ class Hero {
     this.kbx = 0; this.kbz = 0; this.flashT = 0; this.flashOn = false; this.ghost = false; this.walk = 0;
     this.numAcc = 0; this.numT = 0; this.laserSfxT = 0;
     this.mx = 0; this.mz = 0; this.dance = null; this.danceT = 0;
+    this.lvx = 0; this.lvz = 0; this.launched = false; this.padCd = 0;
     this.ai = isPlayer ? null : { target: null, think: 0, strafe: 1, strafeT: 0, wander: null, goal: null, react: 0, stuckT: 0, lx: 0, lz: 0 };
     if (key === 'brickster') this.shieldMesh = makeShield(this);
     if (key === 'barf') this.beam = makeBeam();
@@ -1380,6 +1427,7 @@ function updateHoles(dt) {
 function collide(h) {
   let hit = false;
   for (const c of colliders) {
+    if (h.y > 4 && c.kind !== 'volcano') continue; // launched high over rocks, crates and towers
     const dx = h.x - c.x, dz = h.z - c.z, d = Math.hypot(dx, dz), min = c.r + h.radius;
     if (d < min && d > 0.0001) { h.x = c.x + dx / d * min; h.z = c.z + dz / d * min; hit = true; }
   }
@@ -1432,10 +1480,21 @@ function updateHero(h, dt) {
   }
   h.x += h.kbx * dt; h.z += h.kbz * dt;
   const k = Math.exp(-5 * dt); h.kbx *= k; h.kbz *= k;
+  if (h.launched) {
+    h.x += h.lvx * dt; h.z += h.lvz * dt;
+    if (Math.random() < 0.6) spawnP(h.x + rand(-0.4, 0.4), h.y + rand(0.5, 2), h.z + rand(-0.4, 0.4), 0, 0, 0, pick([0x5ff6ff, 0xffffff]), rand(0.15, 0.3), 0.4);
+  }
   if (collide(h) && h.dashing) h.dashUntil = 0;
 
   // jump / gravity
-  if (h.y > 0 || h.vy > 0) { h.vy -= 28 * dt; h.y += h.vy * dt; if (h.y <= 0) { h.y = 0; h.vy = 0; } }
+  if (h.y > 0 || h.vy > 0) {
+    h.vy -= 28 * dt; h.y += h.vy * dt;
+    if (h.y <= 0) {
+      h.y = 0; h.vy = 0;
+      if (h.launched) { h.launched = false; h.lvx = h.lvz = 0; burst(h.x, 0.3, h.z, 14, [0x8a7f8c, 0xb8aebb], 5, 0.35, 0.5, 6); }
+    }
+  }
+  updatePads(h);
 
   // environment damage
   if (lava) {
@@ -2060,6 +2119,8 @@ function drawMinimap() {
   mm.fillStyle = '#ff7a1a';
   for (const l of lavaPools) { mm.beginPath(); mm.arc(X(l.x), Y(l.z), l.r * S, 0, TAU); mm.fill(); }
   mm.fillStyle = '#2a2228'; mm.beginPath(); mm.arc(c, c, 16 * S, 0, TAU); mm.fill();
+  mm.fillStyle = '#5ff6ff';
+  for (const p of pads) { mm.beginPath(); mm.arc(X(p.x), Y(p.z), 3, 0, TAU); mm.fill(); }
   mm.fillStyle = '#ff9a1a'; mm.beginPath(); mm.arc(c, c, 4 * S, 0, TAU); mm.fill();
   // storm: purple outside the circle
   mm.save();
@@ -2445,6 +2506,7 @@ function frame(now) {
   lavaTex.offset.x += dt * 0.03; lavaTex.offset.y += dt * 0.015;
   seaTex.offset.x += dt * 0.004; seaTex.offset.y -= dt * 0.002;
   for (const f of torches) f.scale.y = 1 + Math.sin(now * 0.02 + f.id) * 0.2;
+  updatePadFx(now);
   updateSmoke(dt);
   updateEmbers(dt);
 
@@ -2470,5 +2532,5 @@ requestAnimationFrame(frame);
 const auto = new URLSearchParams(location.search).get('auto');
 if (auto && HEROES[auto]) { if (!playerName) playerName = 'Tester'; chosenHero = auto; startMatch(); }
 else if (!playerName) showLogin();
-window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, storm, simulate, get T() { return T; } };
+window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, storm, simulate, get T() { return T; }, pads };
 })();

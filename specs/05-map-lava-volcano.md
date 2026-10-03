@@ -21,6 +21,19 @@
 - 🔧 Boomer's lobbed bombs fly **over** obstacles
 - 🔧 Barf Bush's leaf barf and leaf laser pass through obstacles (keeps it simple)
 
+## Launch pads ✅
+Bounce pads that throw you high across the map (the boys' request, 2026-10-03).
+- 🔧 **6 pads:** 3 in a ring near the volcano and 3 out on the island, never in lava or rocks
+- 🔧 Step on one and you fly **up and forward**, in the direction you're facing, about 30 units
+- 🔧 You can still steer a little and attack while in the air
+- 🔧 High in the air you fly **over** boulders, crates and towers, but not the volcano
+- 🔧 Good for escaping the storm or jumping into a fight. Watch out: you can land in lava!
+- 🔧 Bots don't aim for pads, but they get launched if they walk onto one
+- 🔧 No damage for landing
+- 🔧 **Look:** a dark metal base with a glowing cyan top, a white up-arrow, and a ring that pulses upward
+- 🔧 A "boing" sound and a cyan trail while flying, then a dust puff on landing
+- 🔧 Shown on the minimap as cyan dots
+
 ## Look and feel ✅ (from art)
 - **Blue sky** with soft clouds, and a big dark smoke plume rising from the volcano
 - The volcano is erupting, with **glowing lava streaks** running down its sides

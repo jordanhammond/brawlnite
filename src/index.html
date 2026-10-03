@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrawlNite</title>
+<style>
+  :root {
+    --bg: #1a0d08;
+    --panel: rgba(30, 14, 8, 0.92);
+    --text: #fff3e6;
+    --muted: #d9b8a0;
+    --accent: #ff7a1a;
+    --accent2: #ffd23f;
+    --good: #4cd964;
+    --bad: #ff3b30;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Trebuchet MS", system-ui, sans-serif; user-select: none; }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .hidden { display: none !important; }
+
+  /* ---------- menu ---------- */
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: safe center; gap: 14px; padding: 16px; z-index: 10;
+    background: radial-gradient(ellipse at center, rgba(120,30,0,0.75), rgba(20,5,0,0.95)); overflow-y: auto; }
+  h1.logo { margin: 0; font-size: clamp(40px, 7vw, 80px); letter-spacing: 4px; color: var(--accent2);
+    text-shadow: 0 6px 0 #b33a00, 0 10px 20px rgba(0,0,0,0.6); font-weight: 900; }
+  .sub { margin: -10px 0 0; color: var(--muted); font-size: 18px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; max-width: 1100px; }
+  .card { width: 225px; background: var(--panel); border: 3px solid #5a2a14; border-radius: 16px; padding: 10px 12px;
+    cursor: pointer; transition: transform .12s, border-color .12s; }
+  .card:hover { transform: translateY(-4px); }
+  .card.sel { border-color: var(--accent2); box-shadow: 0 0 24px rgba(255,210,63,0.5); }
+  .card .face { font-size: 34px; text-align: center; line-height: 1; }
+  .card.locked { cursor: not-allowed; filter: grayscale(0.85); opacity: 0.6; }
+  .card.locked:hover { transform: none; }
+  .card .lock { margin-top: 6px; text-align: center; font-weight: 800; color: var(--accent2); font-size: 13px; }
+  #unlockmsg { font-size: 18px; color: var(--accent2); }
+  #unlockmsg.big { font-size: 28px; font-weight: 900; animation: pulse .6s infinite alternate; }
+  .card h3 { margin: 4px 0 6px; text-align: center; font-size: 22px; }
+  .card p { margin: 4px 0; font-size: 13px; color: var(--muted); line-height: 1.35; }
+  .card b { color: var(--text); }
+  .stat { display: flex; align-items: center; gap: 6px; font-size: 12px; margin: 3px 0; }
+  .stat span { width: 52px; color: var(--muted); }
+  .stat .bar { flex: 1; height: 8px; background: #3a1a0c; border-radius: 4px; overflow: hidden; }
+  .stat .bar i { display: block; height: 100%; background: var(--accent); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .btn { background: var(--accent); color: #fff; border: 0; border-radius: 12px; padding: 12px 28px;
+    font-size: 22px; font-weight: 800; cursor: pointer; box-shadow: 0 5px 0 #a33f00; font-family: inherit; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a33f00; }
+  .pill { background: #3a1a0c; color: var(--muted); border: 2px solid #5a2a14; border-radius: 999px;
+    padding: 6px 16px; cursor: pointer; font-family: inherit; font-size: 15px; }
+  .pill.sel { background: var(--accent2); color: #3a1a0c; border-color: var(--accent2); font-weight: 800; }
+  #nameinput { font-size: 26px; padding: 10px 16px; border-radius: 12px; border: 3px solid #5a2a14; background: var(--panel);
+    color: var(--text); text-align: center; width: min(320px, 80vw); font-family: inherit; outline: none; user-select: text; }
+  #nameinput:focus { border-color: var(--accent2); }
+  #nameinput.shake { animation: shake .4s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  .player-btn { font-size: 20px; padding: 10px 20px; }
+  .player-btn:hover { border-color: var(--accent2); color: var(--text); }
+  #namemsg { min-height: 22px; margin: 0; color: #ff8a80; font-weight: 700; font-size: 17px; }
+  #namemsg.calm { color: var(--muted); }
+  #onlinewarn { color: #ffb74d; font-size: 14px; margin: 0; }
+  #onlinewarn:empty, #scoremsg:empty { display: none; }
+  #scoremsg { color: var(--accent2); font-size: 18px; font-weight: 700; }
+  #scorelist { width: min(460px, 92vw); display: flex; flex-direction: column; gap: 6px; }
+  .scorerow { display: flex; gap: 12px; align-items: center; background: var(--panel); border: 2px solid #5a2a14; border-radius: 10px; padding: 8px 14px; font-size: 18px; }
+  .scorerow.me { border-color: var(--accent2); box-shadow: 0 0 12px rgba(255,210,63,0.4); }
+  .scorerow .rank { width: 44px; text-align: center; font-weight: 800; }
+  .scorerow .who { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scorerow .val { color: var(--accent2); font-weight: 800; }
+  .help { color: var(--muted); font-size: 14px; text-align: center; line-height: 1.6; }
+  kbd { background: #3a1a0c; border: 1px solid #6a3a20; border-radius: 4px; padding: 1px 6px; color: var(--text); }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #crosshair { position: absolute; left: 50%; top: 45%; width: 22px; height: 22px; transform: translate(-50%,-50%); }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,0.85); }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #bottom { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(520px, 92vw); }
+  .bigbar { height: 22px; background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.4); border-radius: 8px;
+    overflow: hidden; position: relative; margin-top: 6px; }
+  .bigbar i { position: absolute; inset: 0; width: 100%; transform-origin: left; }
+  .bigbar b { position: absolute; inset: 0; text-align: center; font-size: 14px; line-height: 18px; text-shadow: 0 1px 2px #000; }
+  #hpfill { background: linear-gradient(#5ef07a, #23a344); }
+  #superfill { background: linear-gradient(#ffe066, #ff9f1a); }
+  #superbar.ready { animation: pulse .6s infinite alternate; border-color: var(--accent2); }
+  @keyframes pulse { from { box-shadow: 0 0 4px var(--accent2); } to { box-shadow: 0 0 22px var(--accent2); } }
+  #heroname { font-weight: 800; font-size: 18px; text-shadow: 0 2px 3px #000; }
+  #effects { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%); display: flex; gap: 8px; }
+  .fx { background: rgba(0,0,0,0.6); border-radius: 10px; padding: 4px 10px; font-size: 18px; font-weight: 700; }
+  #topinfo { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); text-align: center;
+    text-shadow: 0 2px 3px #000; }
+  #alive { font-size: 26px; font-weight: 900; }
+  #stormtxt { font-size: 15px; color: #e3b8ff; }
+  #feed { position: absolute; top: 12px; left: 12px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #feed div { background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 6px; }
+  #minimap { position: absolute; top: 12px; right: 12px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.4); }
+  #warn { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: 900;
+    color: #ff6b6b; text-shadow: 0 2px 4px #000; }
+  #tags { position: absolute; inset: 0; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 12px; font-weight: 700;
+    text-shadow: 0 1px 2px #000; white-space: nowrap; }
+  .tag .hb { width: 60px; height: 6px; background: rgba(0,0,0,0.6); border-radius: 3px; overflow: hidden; margin: 2px auto 0; }
+  .tag .hb i { display: block; height: 100%; background: #ff4d4d; }
+  .dmg { position: absolute; transform: translate(-50%, -50%); font-weight: 900; font-size: 20px; color: #fff;
+    text-shadow: 0 2px 2px #000, 0 0 6px #000; }
+  #popup { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); font-size: 30px; font-weight: 900;
+    color: var(--accent2); text-shadow: 0 2px 4px #000; transition: opacity .3s; }
+  #stormfx { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(155,77,255,0.7); opacity: 0; transition: opacity .3s; }
+  #ink { position: absolute; inset: 0; opacity: 0; }
+  #ink .blob { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(25,8,40,0.97) 55%, rgba(25,8,40,0) 72%); }
+  #redflash { position: absolute; inset: 0; box-shadow: inset 0 0 120px rgba(255,0,0,0.0); transition: box-shadow .15s; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud" class="hidden">
+  <div id="tags"></div>
+  <div id="redflash"></div>
+  <div id="crosshair"></div>
+  <div id="feed"></div>
+  <div id="topinfo"><div id="alive"></div><div id="stormtxt"></div></div>
+  <canvas id="minimap" width="160" height="160"></canvas>
+  <div id="warn"></div>
+  <div id="popup"></div>
+  <div id="stormfx"></div>
+  <div id="ink"></div>
+  <div id="effects"></div>
+  <div id="bottom">
+    <div id="heroname"></div>
+    <div class="bigbar"><i id="hpfill"></i><b id="hptxt"></b></div>
+    <div class="bigbar" id="superbar"><i id="superfill"></i><b id="supertxt"></b></div>
+  </div>
+</div>
+
+<div id="menu" class="screen">
+  <h1 class="logo">BRAWLNITE</h1>
+  <p class="sub">🌋 Lava Volcano · 10 heroes drop in · last one standing wins</p>
+  <p class="sub" id="record"></p>
+  <div class="row">
+    <button class="pill" id="switchuser">👤 Change player</button>
+    <button class="pill hidden" id="showscores">🏆 High scores</button>
+  </div>
+  <p class="sub" id="onlinewarn"></p>
+  <div class="row">
+    <span style="color:var(--muted)">Bots:</span>
+    <button class="pill" data-diff="easy">😊 Easy</button>
+    <button class="pill sel" data-diff="normal">😎 Normal</button>
+    <button class="pill" data-diff="hard">😈 Hard</button>
+  </div>
+  <button class="btn" id="play">▶ PLAY</button>
+  <div class="cards" id="cards"></div>
+  <div class="help">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>Mouse</b> aim (or <kbd>←</kbd><kbd>→</kbd>) ·
+    <b>Click</b> attack · <kbd>E</kbd> super · <kbd>Space</kbd> jump · <kbd>Esc</kbd> pause<br>
+    Pickups: 💪 strength · ⚡ speed · 🩹 health · 🧥 invisibility &nbsp;|&nbsp; Avoid the lava and the purple storm!
+  </div>
+</div>
+
+<div id="login" class="screen hidden">
+  <h1 class="logo">BRAWLNITE</h1>
+  <p class="sub" style="font-size:24px">What's your name?</p>
+  <p class="sub" id="pickhint">Tap your name, or type a new one:</p>
+  <div class="row" id="players"></div>
+  <input id="nameinput" maxlength="12" placeholder="Type your name" autocomplete="off" spellcheck="false">
+  <p id="namemsg"></p>
+  <button class="btn" id="letsgo">▶ LET'S GO</button>
+  <p class="help">Use a nickname, not your real full name. It shows on the public high score list.</p>
+</div>
+
+<div id="scores" class="screen hidden">
+  <h1 class="logo" style="font-size:56px">HIGH SCORES</h1>
+  <div class="row">
+    <button class="pill sel" data-tab="wins">🏆 Most wins</button>
+    <button class="pill" data-tab="best">⭐ Best match</button>
+  </div>
+  <div id="scorelist"></div>
+  <button class="btn" id="scoresback">◀ Back</button>
+</div>
+
+<div id="pause" class="screen hidden">
+  <h1 class="logo" style="font-size:56px">PAUSED</h1>
+  <p class="sub" id="pausesub"></p>
+  <button class="btn" id="resume">▶ Click to resume</button>
+  <button class="pill" id="quit">Quit to menu</button>
+</div>
+
+<div id="end" class="screen hidden">
+  <h1 class="logo" id="endtitle"></h1>
+  <p class="sub" id="endsub" style="font-size:22px"></p>
+  <p class="sub" id="unlockmsg"></p>
+  <p class="sub" id="scoremsg"></p>
+  <button class="btn" id="again">▶ Play again</button>
+  <button class="pill" id="tomenu">Change hero</button>
+</div>
+
+<!--THREE-->
+<!--GAME-->
+</body>
+</html>

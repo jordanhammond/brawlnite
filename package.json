@@ -1,0 +1,14 @@
+{
+  "name": "brawlnite",
+  "private": true,
+  "scripts": {
+    "build": "python3 build.py",
+    "dev": "python3 build.py && wrangler dev",
+    "db:init:local": "wrangler d1 execute brawlnite --local --file worker/schema.sql",
+    "db:init": "wrangler d1 execute brawlnite --remote --file worker/schema.sql",
+    "deploy": "python3 build.py && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

@@ -1,0 +1,13 @@
+# Cloudflare Worker: serves dist/ (the game) and /api/* (high scores). See README "Put it online".
+name = "brawlnite"
+main = "worker/index.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "brawlnite"
+database_id = "0d904fa1-d1f5-4a49-bd2e-21452c10ca83"

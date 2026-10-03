@@ -3,6 +3,8 @@
 ## Hosting ✅
 - ✅ Hosted on **Cloudflare** (free plan): one Cloudflare **Worker** serves the game and a small API
 - 🔧 Scores live in a **Cloudflare D1** database (SQLite)
+- ✅ Web address: **brawlnite.mattlucas.live** (the boys' domain)
+- ✅ Every push to `main` on GitHub deploys automatically (GitHub Actions)
 - 🔧 Same game file everywhere:
   - opened from a web address → **online**: high scores are on
   - opened as a local file → **offline**: plays exactly as before, with no high scores

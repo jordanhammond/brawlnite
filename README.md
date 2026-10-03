@@ -27,6 +27,13 @@ One-time setup, run in this folder:
 
 After any change to the game, just run `npm run deploy` again.
 
+## Auto-deploy (GitHub Actions)
+Every push to `main` builds the game and deploys it to Cloudflare (`.github/workflows/deploy.yml`). Watch it in the repo's **Actions** tab.
+
+It needs two repo secrets (GitHub → Settings → Secrets and variables → Actions):
+- `CLOUDFLARE_ACCOUNT_ID`: shown by `npx wrangler whoami`
+- `CLOUDFLARE_API_TOKEN`: Cloudflare dashboard → My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** template. Under Zone Resources pick `mattlucas.live`, and add **Zone · DNS · Edit** so it can manage the custom domain.
+
 ## Remove a player (rude name that slipped through, or a cheater)
 ```
 npx wrangler d1 execute brawlnite --remote --command "DELETE FROM players WHERE name_key = 'badname'"

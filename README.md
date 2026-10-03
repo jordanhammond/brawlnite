@@ -15,7 +15,7 @@ WASD move · Mouse aim (or ← →) · Click attack · E super · Space jump · 
 - The design lives in `specs/`, and reference art goes in `art/`
 
 ## Live site
-https://brawlnite.run-with-it-account.workers.dev (Cloudflare Worker `brawlnite` + D1 database `brawlnite`; no custom domains or routes, so it doesn't touch any other site on the account)
+https://brawlnite.mattlucas.live (Cloudflare Worker `brawlnite` + D1 database `brawlnite`). The custom domain is set in `wrangler.toml`. Also still reachable at https://brawlnite.run-with-it-account.workers.dev
 
 ## Put it online (Cloudflare, free)
 One-time setup, run in this folder:

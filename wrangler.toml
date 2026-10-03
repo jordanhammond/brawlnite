@@ -2,6 +2,12 @@
 name = "brawlnite"
 main = "worker/index.js"
 compatibility_date = "2026-09-01"
+workers_dev = true   # keep the old workers.dev address working too
+
+# Custom domain on the boys' mattlucas.live zone (Cloudflare creates the DNS record + HTTPS cert)
+routes = [
+  { pattern = "brawlnite.mattlucas.live", custom_domain = true }
+]
 
 [assets]
 directory = "./dist"

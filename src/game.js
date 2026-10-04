@@ -1614,12 +1614,15 @@ function projMesh(type) {
   if (type === 'fist') {
     const g = new THREE.Group(), f = new THREE.Mesh(pGeo, PROJ.fistMat); f.scale.set(0.5, 0.45, 0.5); g.add(f);
     const c = new THREE.Mesh(pGeo, PROJ.cuffMat); c.scale.set(0.42, 0.38, 0.2); c.position.z = -0.32; g.add(c);
+    g.scale.setScalar(3); // big cartoon fists
     return g;
   }
   if (type === 'heart') { const g = heartGroup(PROJ.heartMat); g.scale.setScalar(3.2); return g; }
   if (type === 'bolt') {
     const g = new THREE.Group();
-    for (const [x, z, ry] of [[0.08, 0.35, 0.5], [-0.08, 0, -0.5], [0.08, -0.35, 0.5]]) { const m = new THREE.Mesh(pGeo, PROJ.boltMat); m.scale.set(0.14, 0.14, 0.45); m.position.set(x, 0, z); m.rotation.y = ry; g.add(m); }
+    // an upright ⚡ zigzag, facing the camera behind the hero
+    for (const [x, y, rz] of [[0.1, 0.42, -0.5], [-0.1, 0, 0.5], [0.1, -0.42, -0.5]]) { const m = new THREE.Mesh(pGeo, PROJ.boltMat); m.scale.set(0.16, 0.55, 0.16); m.position.set(x, y, 0); m.rotation.z = rz; g.add(m); }
+    g.scale.setScalar(2.2);
     return g;
   }
   if (type === 'mallow') { const m = new THREE.Mesh(PROJ.mallowGeo, PROJ.mallowMat); m.rotation.x = Math.PI / 2; const g = new THREE.Group(); g.add(m); return g; }
@@ -2609,7 +2612,7 @@ function updateProjectiles(dt) {
       if (p.type === 'snow' && Math.random() < 0.5) spawnP(p.x, p.y, p.z, 0, -1, 0, 0xdffaff, 0.15, 0.3);
       if (p.type === 'gas') { p.mesh.scale.setScalar(0.7 + p.travelled / p.range * 0.8); p.mesh.rotation.y += dt * 3; if (Math.random() < 0.6) spawnP(p.x + rand(-0.5, 0.5), p.y + rand(-0.4, 0.4), p.z + rand(-0.5, 0.5), 0, 0.6, 0, pick([0xa8d64a, 0xd4f07a, 0x7a9a2c]), 0.3, 0.5); }
       if (p.type === 'heart' && Math.random() < 0.8) spawnP(p.x + rand(-1, 1), p.y + rand(-1, 1), p.z + rand(-1, 1), 0, 0.5, 0, pick([0xff2e55, 0xff9ab0, 0xffffff]), 0.3, 0.4);
-      if (p.type === 'bolt') { p.mesh.rotation.z = rand(-0.5, 0.5); if (Math.random() < 0.5) spawnP(p.x, p.y, p.z, rand(-2, 2), rand(-2, 2), rand(-2, 2), pick([0xffe14d, 0x9ff3ff]), 0.12, 0.2); }
+      if (p.type === 'bolt') { p.mesh.rotation.z = rand(-0.2, 0.2); for (let k = 0; k < 2; k++) spawnP(p.x + rand(-0.4, 0.4), p.y + rand(-0.4, 0.4), p.z + rand(-0.4, 0.4), rand(-3, 3), rand(-3, 3), rand(-3, 3), pick([0xffe14d, 0x9ff3ff, 0xffffff]), 0.22, 0.25); }
       if (p.type === 'mallow' || p.type === 'kernel' || p.type === 'popcorn') { p.mesh.rotation.x += dt * 12; p.mesh.rotation.z += dt * 7; }
       if (p.type === 'gummy') { p.y = p.y0 + Math.abs(Math.sin(p.travelled * 0.45)) * 1.1 - 0.4; p.mesh.position.y = p.y; p.mesh.scale.y = 0.8 + Math.abs(Math.cos(p.travelled * 0.45)) * 0.4; }
       if ((p.type === 'crystal' || p.type === 'bigcrystal') && Math.random() < (p.type === 'crystal' ? 0.5 : 1)) spawnP(p.x, p.y, p.z, 0, 0, 0, pick([0x9ff3ff, 0xff9ad5, 0xffffff]), p.type === 'crystal' ? 0.12 : 0.4, 0.4);
@@ -4109,5 +4112,5 @@ const query = new URLSearchParams(location.search), auto = query.get('auto');
 if (auto && HEROES[auto]) { if (!playerName) playerName = 'Tester'; chosenHero = auto; chosenWorld = WORLDS[query.get('world')] ? query.get('world') : 'lava'; startMatch(); }
 else if (!playerName) showLogin();
 else if (pendingRoom) { const code = pendingRoom; pendingRoom = null; showJoin(code); joinRoom(code); }
-window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, damage, storm, simulate, get T() { return T; }, pads, get net() { return net; }, get quality() { return quality; }, get watch() { return watch; }, setWorld, get world() { return world; }, colliders, lavaPools };
+window.__bloknite = { get heroes() { return heroes; }, get player() { return player; }, get state() { return state; }, useSuper, attack, damage, storm, simulate, get T() { return T; }, pads, get net() { return net; }, get quality() { return quality; }, get watch() { return watch; }, setWorld, get world() { return world; }, colliders, lavaPools, projectiles };
 })();

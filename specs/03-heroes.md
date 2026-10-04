@@ -230,11 +230,13 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 ## ❤️ Bruno ✅ (the boys' design)
 - **Look ✅:** a red heart with angry eyes, with 🔧 big white boxing gloves and a boxing belt
 - **Attack: Punches ✅:** flying fists from alternating hands · 🔧 20 damage · short range 9 · fast, every 0.4 s
+  - ✅ 2026-10-04: the fists are **big** cartoon boxing gloves (the boys: "needs to be bigger")
 - **Super: Mega Heart ✅:** throws a massive heart **far and fast** · 🔧 65 damage · range 40 · knocks the target flying
 
 ## 🌩️ Electro ✅ (the boys' design)
 - **Look ✅:** a human crackling with electricity: 🔧 purple suit, glowing yellow spiky hair, blue sparks on the hands, lightning on the chest (different colours from Zippy)
 - **Attack: Lightning Bolt ✅:** 🔧 20 damage · range 20 · every 0.5 s · the zap **jumps to a 2nd enemy** within 7 for 10 damage
+  - ✅ 2026-10-04: each bolt is a **big upright ⚡ zigzag**, easy to see from behind (the boys: "needs to be bigger")
 - **Super: Sky Strike ✅:** a big lightning strike from the sky · 🔧 a yellow warning ring for 0.7 s, then 75 damage in a 5-unit circle · 12 ahead (bots aim at their target)
 
 ## 🍡 Marshy ✅ (the boys' design)

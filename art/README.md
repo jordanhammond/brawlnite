@@ -8,7 +8,7 @@ Drop images here to guide how things look in the game. Any format works: PNG, JP
 | `heroes/zippy/` | Zippy ideas |
 | `heroes/boomer/` | Boomer ideas |
 | `heroes/barf-bush/` | Barf Bush ideas |
-| `map/` | Lava Volcano ideas |
+| `map/` | World ideas (Lava Volcano, Candy Land) |
 | `pickups/` | Icons for 💪 ⚡ 🩹 🧥 |
 
 ## Tips

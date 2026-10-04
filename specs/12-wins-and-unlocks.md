@@ -38,5 +38,30 @@
 - 🔧 Revealing them shows "🤫 4 SECRET HEROES REVEALED!" on the end screen
 - Hero designs: see 03-heroes.md
 
+## Tier 4: candy heroes ✅
+- ✅ 8 more heroes, **hidden until Candy Land unlocks** (8 wins), then 🔧 revealed all at once
+- ✅ They unlock **one per win**, with the boys' 4 first and Claude's 4 last:
+
+| Wins | Unlocks |
+|---|---|
+| 9 | 💨 Fart Master |
+| 10 | ❤️ Bruno |
+| 11 | 🌩️ Electro |
+| 12 | 🍡 Marshy |
+| 13 | 🧸 Gummo |
+| 14 | 🍿 Kernel |
+| 15 | 💎 Rocky |
+| 16 | ☁️ Fluff (the very last) |
+
+- 🔧 The 8th win's end screen also shows "🍬 8 CANDY HEROES REVEALED!"
+- 🔧 Bots only use them once they're revealed
+- Hero designs: see 03-heroes.md
+
+## New world: Candy Land ✅
+- ✅ 🍭 **Candy Land** unlocks once all 12 heroes are unlocked: **8 wins**
+- 🔧 The menu shows it locked until then, with progress (5/8)
+- Details: see 16-map-candy-land.md
+
 ## Changelog
+- 2026-10-04: Candy Land world unlocks at 8 wins, plus 8 candy heroes (wins 9–16)
 - 2026-10-03: All 4 unlocked at once at 3 wins → one per win; Barf Bush is now the 8th unlock and Pizza Pete is a starter (the boys' request)

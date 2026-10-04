@@ -51,7 +51,7 @@ Measured 2026-10-03: game code takes under 1 ms a frame, but the graphics chip w
 
 ## Code structure (game.js) 🔧
 - `HEROES`: data for the 4 heroes (stats, colours, attack and super settings)
-- `buildMap()`: island, volcano, rocks, lava pools
+- `WORLDS` + `setWorld()`: each world (`buildLava()`, `buildCandy()`) is built into its own group the first time it's needed, with a fixed seed so every player gets the same map
 - `Hero`: model, movement, collision, attack, super, effects
 - `Projectile` types: bolt, zap, bomb, rocket
 - `Pickups`, `Storm`, `Particles`, `Audio`
@@ -60,6 +60,6 @@ Measured 2026-10-03: game code takes under 1 ms a frame, but the graphics chip w
 - Main loop: input → bots → heroes → projectiles → storm/lava → pickups → camera → render → HUD
 
 ## Test hooks 🔧
-- `BrawlNite.html?auto=<hero>` starts a match straight away (hero = brickster, zippy, boomer, or barf)
+- `BrawlNite.html?auto=<hero>` starts a match straight away (hero = brickster, zippy, boomer, or barf). Add `&world=candy` for Candy Land.
 - `window.__bloknite` exposes `heroes`, `player`, `storm`, `simulate(dt)`, `attack`, and `useSuper` for headless tests
 - Simulated full match: lasts about 2:45, and the storm closes at about 2:25 as designed

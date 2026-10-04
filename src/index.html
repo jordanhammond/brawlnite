@@ -54,6 +54,7 @@
   .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #a33f00; }
   .pill { background: #3a1a0c; color: var(--muted); border: 2px solid #5a2a14; border-radius: 999px;
     padding: 6px 16px; cursor: pointer; font-family: inherit; font-size: 15px; }
+  .pill.locked { opacity: 0.6; cursor: not-allowed; }
   .pill.sel { background: var(--accent2); color: #3a1a0c; border-color: var(--accent2); font-weight: 800; }
   #nameinput { font-size: 26px; padding: 10px 16px; border-radius: 12px; border: 3px solid #5a2a14; background: var(--panel);
     color: var(--text); text-align: center; width: min(320px, 80vw); font-family: inherit; outline: none; user-select: text; }
@@ -226,7 +227,7 @@
 
 <div id="menu" class="screen">
   <h1 class="logo">BRAWLNITE</h1>
-  <p class="sub">🌋 Lava Volcano · 10 heroes drop in · last one standing wins</p>
+  <p class="sub" id="tagline">🌋 Lava Volcano · 10 heroes drop in · last one standing wins</p>
   <p class="sub" id="record"></p>
   <div class="row">
     <button class="pill" id="switchuser">👤 Change player</button>
@@ -243,13 +244,14 @@
     <button class="pill sel" data-diff="normal">😎 Normal</button>
     <button class="pill" data-diff="hard">😈 Hard</button>
   </div>
+  <div class="row"><span style="color:var(--muted)">World:</span><span class="row" id="worlds"></span></div>
   <button class="btn" id="play">▶ PLAY</button>
   <div class="cards" id="cards"></div>
   <div class="help">
     <span class="keyhelp"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <b>Mouse</b> aim (or <kbd>←</kbd><kbd>→</kbd>) ·
     <b>Click</b> attack · <kbd>E</kbd> super · <kbd>Space</kbd> jump · <kbd>Esc</kbd> pause</span>
     <span class="touchhelp">🕹️ <b>Left thumb</b> move · 👆 <b>Drag right side</b> aim · 🔥 attack · ⭐ super · ⬆ jump · ⏸ pause</span><br>
-    Pickups: 💪 strength · ⚡ speed · 🩹 health · 🧥 invisibility &nbsp;|&nbsp; Avoid the lava and the purple storm!
+    Pickups: 💪 strength · ⚡ speed · 🩹 health · 🧥 invisibility &nbsp;|&nbsp; Avoid the lava pools and the purple storm!
   </div>
 </div>
 
@@ -290,6 +292,7 @@
   <div id="lobbylist"></div>
   <p class="sub" id="lobbyinfo"></p>
   <p id="lobbywait" class="sub"></p>
+  <div class="row" id="lobbyworldrow"><span style="color:var(--muted)">World:</span><span class="row" id="lobbyworlds"></span></div>
   <div class="row">
     <button class="btn" id="lobbystart">▶ START</button>
     <button class="pill" id="lobbyleave">Leave</button>

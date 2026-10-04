@@ -12,7 +12,7 @@ A battle royale game for the browser, built by Jordan and the boys.
 |---|---|
 | [01-overview.md](01-overview.md) | Vision, scope, and what's in and out of version 1 |
 | [02-gameplay.md](02-gameplay.md) | Match flow, win and lose, damage, super charge |
-| [03-heroes.md](03-heroes.md) | The 4 heroes: looks, stats, attacks, supers |
+| [03-heroes.md](03-heroes.md) | All 20 heroes: looks, stats, attacks, supers |
 | [04-pickups.md](04-pickups.md) | Strength, Speed, Health, Invisibility |
 | [05-map-lava-volcano.md](05-map-lava-volcano.md) | Map layout, lava, rocks, the volcano |
 | [06-storm.md](06-storm.md) | Shrinking storm phases and damage |
@@ -25,6 +25,7 @@ A battle royale game for the browser, built by Jordan and the boys.
 | [13-players.md](13-players.md) | Player names, profiles, change player |
 | [14-online-and-high-scores.md](14-online-and-high-scores.md) | Cloudflare hosting, high score lists, name filter |
 | [15-multiplayer.md](15-multiplayer.md) | Playing with friends: room codes, lobby, host + guests |
+| [16-map-candy-land.md](16-map-candy-land.md) | Candy Land: the second world, candy tree, hot chocolate |
 
 ## Art references
 

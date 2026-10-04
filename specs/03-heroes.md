@@ -204,3 +204,61 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
   - 🔧 Brickster's Brick Fort protects against it
   - 🔧 Bots try to steer around black holes
 - **Style 🔧:** medium speed and health
+
+---
+
+# 🍬 Candy heroes ✅ (hidden until Candy Land unlocks at 8 wins; see 12-wins-and-unlocks.md)
+
+✅ Fart Master, Bruno, Electro and Marshy were designed by the boys. ✅ Gummo, Kernel, Rocky and Fluff were Claude's ideas, picked by the boys as the **last 4** unlocks. The numbers are 🔧 defaults.
+
+| Hero | HP | Speed | Role | Unlock |
+|---|---|---|---|---|
+| 💨 Fart Master | 150 | 8 | Gas cloud | 9 wins |
+| ❤️ Bruno | 170 | 8.5 | Heart boxer | 10 wins |
+| 🌩️ Electro | 120 | 8.5 | Electric | 11 wins |
+| 🍡 Marshy | 210 | 6.5 (slow) | Squishy tank | 12 wins |
+| 🧸 Gummo | 140 | 8 | Gummy bear, minions | 13 wins |
+| 🍿 Kernel | 130 | 8.5 | Jumper | 14 wins |
+| 💎 Rocky | 110 | 7.5 | Sniper | 15 wins |
+| ☁️ Fluff | 150 | 8 | Wall builder | 16 wins (last) |
+
+## 💨 Fart Master ✅ (the boys' design)
+- **Look ✅:** a gassy fart in a human shape: puffy olive-green gas clumps, a black face with white eyes, and stink lines
+- **Attack: Fart Cloud ✅:** a big, slow green puff · 🔧 24 damage · range 14 · wide · every 0.55 s
+- **Super: Toxic Fart Bomb ✅:** lobbed like Boomer's bomb, it bursts into a poison cloud · 🔧 radius 5, lasts 5 s, 18 damage/s to enemies inside · lands 12 ahead (bots aim at their target)
+
+## ❤️ Bruno ✅ (the boys' design)
+- **Look ✅:** a red heart with angry eyes, with 🔧 big white boxing gloves and a boxing belt
+- **Attack: Punches ✅:** flying fists from alternating hands · 🔧 20 damage · short range 9 · fast, every 0.4 s
+- **Super: Mega Heart ✅:** throws a massive heart **far and fast** · 🔧 65 damage · range 40 · knocks the target flying
+
+## 🌩️ Electro ✅ (the boys' design)
+- **Look ✅:** a human crackling with electricity: 🔧 purple suit, glowing yellow spiky hair, blue sparks on the hands, lightning on the chest (different colours from Zippy)
+- **Attack: Lightning Bolt ✅:** 🔧 20 damage · range 20 · every 0.5 s · the zap **jumps to a 2nd enemy** within 7 for 10 damage
+- **Super: Sky Strike ✅:** a big lightning strike from the sky · 🔧 a yellow warning ring for 0.7 s, then 75 damage in a 5-unit circle · 12 ahead (bots aim at their target)
+
+## 🍡 Marshy ✅ (the boys' design)
+- **Look ✅:** a marshmallow: puffy white body and head, 🔧 a toasted top and rosy cheeks
+- **Attack: Mini Mallows ✅:** 3 little marshmallows in a spread · 🔧 11 damage each · range 15 · every 0.6 s
+- **Super: Giant Marshy ✅:** becomes a giant marshmallow · 🔧 2× size for 6 s, takes 40% less damage, and **bounces enemies away** when he touches them (10 damage)
+
+## 🧸 Gummo ✅ (Claude's idea)
+- **Look:** a bright red gummy bear with round ears, a light belly and a shiny spot
+- **Attack: Gummy Blob:** a blob that bounces along · 🔧 22 damage · range 18 · every 0.5 s
+- **Super: Gummy Army:** 3 mini gummy bears (red, green, yellow) chase the nearest enemies and go **SPLAT** · 🔧 30 damage each · they last 8 s
+
+## 🍿 Kernel ✅ (Claude's idea)
+- **Look:** a red-and-white striped popcorn bucket body with popcorn hair
+- **Attack: Popping Kernels:** 🔧 18 damage · range 16 · every 0.6 s · at the end of its flight a kernel **pops into 3 bits** (14 damage each)
+- **Super: Butter Slam:** jumps high and forward (over obstacles), then slams down · 🔧 50 damage in a 6.5-unit shockwave that knocks enemies back
+
+## 💎 Rocky ✅ (Claude's idea)
+- **Look:** glittery crystal chunks (blue, pink, purple) on a blocky body, with a **candy-cane rifle**
+- **Attack: Crystal Shot:** slow but powerful · 🔧 34 damage · **range 34, the longest in the game** · every 1.1 s
+- **Super: Crystal Pierce:** a giant crystal flies across the map **through every enemy and obstacle** in a line · 🔧 60 damage each · range 50
+
+## ☁️ Fluff ✅ (Claude's idea)
+- **Look:** a pink-and-blue cotton candy puff head on a paper cone body
+- **Attack: Fluff Ball:** 🔧 20 damage · range 19 · every 0.55 s · **slows** the target a little (1.5 s)
+- **Super: Fluff Wall:** a cotton candy wall pops up 4 ahead, across your path · 🔧 about 8 wide, blocks heroes and shots for **6 s**
+- 🔧 Bots use it to hide when they're below half health

@@ -216,7 +216,7 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 | 💨 Fart Master | 150 | 8 | Gas cloud | 9 wins |
 | ❤️ Bruno | 170 | 8.5 | Heart boxer | 10 wins |
 | 🌩️ Electro | 120 | 8.5 | Electric | 11 wins |
-| 🍡 Marshy | 210 | 6.5 (slow) | Squishy tank | 12 wins |
+| 🍡 Marshy | 210 | 8 ✅ | Squishy tank | 12 wins |
 | 🧸 Gummo | 140 | 8 | Gummy bear, minions | 13 wins |
 | 🍿 Kernel | 130 | 8.5 | Jumper | 14 wins |
 | 💎 Rocky | 110 | 7.5 | Sniper | 15 wins |
@@ -230,17 +230,20 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 ## ❤️ Bruno ✅ (the boys' design)
 - **Look ✅:** a red heart with angry eyes, with 🔧 big white boxing gloves and a boxing belt
 - **Attack: Punches ✅:** flying fists from alternating hands · 🔧 20 damage · short range 9 · fast, every 0.4 s
+  - ✅ 2026-10-04: the fists are **big** cartoon boxing gloves (the boys: "needs to be bigger")
 - **Super: Mega Heart ✅:** throws a massive heart **far and fast** · 🔧 65 damage · range 40 · knocks the target flying
 
 ## 🌩️ Electro ✅ (the boys' design)
 - **Look ✅:** a human crackling with electricity: 🔧 purple suit, glowing yellow spiky hair, blue sparks on the hands, lightning on the chest (different colours from Zippy)
 - **Attack: Lightning Bolt ✅:** 🔧 20 damage · range 20 · every 0.5 s · the zap **jumps to a 2nd enemy** within 7 for 10 damage
+  - ✅ 2026-10-04: each bolt is a **big upright ⚡ zigzag**, easy to see from behind (the boys: "needs to be bigger")
 - **Super: Sky Strike ✅:** a big lightning strike from the sky · 🔧 a yellow warning ring for 0.7 s, then 75 damage in a 5-unit circle · 12 ahead (bots aim at their target)
 
 ## 🍡 Marshy ✅ (the boys' design)
 - **Look ✅:** a marshmallow: puffy white body and head, 🔧 a toasted top and rosy cheeks
 - **Attack: Mini Mallows ✅:** 3 little marshmallows in a spread · 🔧 11 damage each · range 15 · every 0.6 s
 - **Super: Giant Marshy ✅:** becomes a giant marshmallow · 🔧 2× size for 6 s, takes 40% less damage, and **bounces enemies away** when he touches them (10 damage)
+- ✅ 2026-10-04: speed 6.5 → 8 (the boys: "move faster")
 
 ## 🧸 Gummo ✅ (Claude's idea)
 - **Look:** a bright red gummy bear with round ears, a light belly and a shiny spot

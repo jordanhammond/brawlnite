@@ -216,7 +216,7 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 | 💨 Fart Master | 150 | 8 | Gas cloud | 9 wins |
 | ❤️ Bruno | 170 | 8.5 | Heart boxer | 10 wins |
 | 🌩️ Electro | 120 | 8.5 | Electric | 11 wins |
-| 🍡 Marshy | 210 | 6.5 (slow) | Squishy tank | 12 wins |
+| 🍡 Marshy | 210 | 8 ✅ | Squishy tank | 12 wins |
 | 🧸 Gummo | 140 | 8 | Gummy bear, minions | 13 wins |
 | 🍿 Kernel | 130 | 8.5 | Jumper | 14 wins |
 | 💎 Rocky | 110 | 7.5 | Sniper | 15 wins |
@@ -243,6 +243,7 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 - **Look ✅:** a marshmallow: puffy white body and head, 🔧 a toasted top and rosy cheeks
 - **Attack: Mini Mallows ✅:** 3 little marshmallows in a spread · 🔧 11 damage each · range 15 · every 0.6 s
 - **Super: Giant Marshy ✅:** becomes a giant marshmallow · 🔧 2× size for 6 s, takes 40% less damage, and **bounces enemies away** when he touches them (10 damage)
+- ✅ 2026-10-04: speed 6.5 → 8 (the boys: "move faster")
 
 ## 🧸 Gummo ✅ (Claude's idea)
 - **Look:** a bright red gummy bear with round ears, a light belly and a shiny spot

@@ -22,6 +22,6 @@ Bots pick what to do in this order of priority:
 
 | Setting | Aim error | Reaction delay | Bot damage |
 |---|---|---|---|
-| 😊 Easy | big | slow (0.6 s) | 70% |
+| 😊 Easy | big | slow (0.8 s) | 55% |
 | 😎 Normal | medium | 0.35 s | 100% |
 | 😈 Hard | small | fast (0.15 s) | 115% |

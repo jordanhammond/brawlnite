@@ -241,6 +241,7 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 
 ## 🍡 Marshy ✅ (the boys' design)
 - **Look ✅:** a marshmallow: puffy white body and head, 🔧 a toasted top and rosy cheeks
+  - ✅ 2026-10-04: squishier (the boys: "a bit plain from the back"): round marshmallow body and head with puffy rims, toasty patches and a **mini-marshmallow backpack**, puffy hands, and he **wobbles like jelly** when he walks or gets hit
 - **Attack: Mini Mallows ✅:** 3 little marshmallows in a spread · 🔧 11 damage each · range 15 · every 0.6 s
 - **Super: Giant Marshy ✅:** becomes a giant marshmallow · 🔧 2× size for 6 s, takes 40% less damage, and **bounces enemies away** when he touches them (10 damage)
 - ✅ 2026-10-04: speed 6.5 → 8 (the boys: "move faster")

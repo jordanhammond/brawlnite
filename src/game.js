@@ -1385,14 +1385,25 @@ const MODELS = {
     return r;
   },
   marshy(h) {
-    const W = 0xfaf6ef;
+    const W = 0xfaf6ef, TOAST = 0xe0a86a;
     const r = buildRig(h, { pants: W, boots: 0xe8dcc8, torso: W, arm: W, glove: W });
-    addBox(h, r.body, 1.4, 1.15, 1.0, W, 0, 1.45, 0);                     // squishy body
-    addBox(h, r.head, 1.3, 1.1, 1.05, W, 0, 0.05, 0);
-    addBox(h, r.head, 1.32, 0.16, 1.07, 0xe0a86a, 0, 0.56, 0);            // toasted top
-    addEyes(h, r.head, 0x3a2a1a, 0.08);
-    for (const s of [-1, 1]) addBox(h, r.head, 0.22, 0.12, 0.04, 0xffaac4, s * 0.42, -0.2, 0.54, { basic: true }); // rosy cheeks
-    addBox(h, r.head, 0.24, 0.1, 0.04, 0x3a2a1a, 0, -0.28, 0.54);
+    const cyl = (parent, rad, len, color, y, z = 0, x = 0) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, len, 18), heroMat(h, color)); m.position.set(x, y, z); parent.add(m); return m; };
+    const rim = (parent, rad, tube, color, y) => { const m = new THREE.Mesh(new THREE.TorusGeometry(rad, tube, 8, 22), heroMat(h, color)); m.rotation.x = Math.PI / 2; m.position.y = y; parent.add(m); return m; };
+    // a round, puffy marshmallow body with soft rims
+    cyl(r.body, 0.75, 1.1, W, 1.45);
+    rim(r.body, 0.68, 0.13, W, 2.0); rim(r.body, 0.68, 0.13, W, 0.9);
+    for (const [x, y] of [[-0.3, 1.7], [0.25, 1.25], [0.05, 1.55], [-0.15, 1.15], [0.35, 1.8]]) addBox(h, r.body, 0.28, 0.2, 0.05, 0xe8b47a, x, y, -0.74); // toasty patches on the back
+    for (const [x, c] of [[-0.24, 0xffc8dc], [0.24, 0xffffff]]) { cyl(r.body, 0.27, 0.42, c, 1.55, -0.95, x); rim(r.body, 0.23, 0.06, c, 1.76).position.set(x, 1.76, -0.95); } // mini marshmallow backpack
+    for (const arm of [r.armL, r.armR]) addBall(h, arm, 0.33, W, 0, -0.78, 0); // puffy hands
+    // head: a marshmallow with a toasted top
+    cyl(r.head, 0.66, 0.95, W, 0.02);
+    rim(r.head, 0.58, 0.13, TOAST, 0.48); rim(r.head, 0.58, 0.13, W, -0.44);
+    cyl(r.head, 0.6, 0.06, 0xeec08a, 0.55);
+    const face = new THREE.Group(); face.position.z = 0.12; r.head.add(face);
+    addEyes(h, face, 0x3a2a1a, 0.08);
+    for (const s of [-1, 1]) addBox(h, face, 0.22, 0.12, 0.04, 0xffaac4, s * 0.38, -0.2, 0.55, { basic: true }); // rosy cheeks
+    addBox(h, face, 0.24, 0.1, 0.04, 0x3a2a1a, 0, -0.28, 0.55);
+    r.squish = true;
     return r;
   },
   gummo(h) {
@@ -2465,6 +2476,12 @@ function animateHero(h, dt, speed) {
   h.spinT = Math.max(0, h.spinT - dt);
   r.body.rotation.y = h.spinT > 0 ? (1 - h.spinT / 0.3) * TAU : 0;
   if (r.tail) r.tail.rotation.y = Math.sin(T * 3 + h.x) * 0.25;
+  if (r.squish) { // Marshy wobbles like jelly when he moves, and more when he's hit
+    const k = h.def.scale * h.size;
+    const w = Math.sin(T * (moving ? 14 : 5) + h.x) * (moving ? 0.07 : 0.03) + (h.flashT > 0 ? Math.sin(T * 45) * 0.1 : 0);
+    r.body.scale.set(k * (1 - w * 0.6), k * (1 + w), k * (1 - w * 0.6));
+    r.head.scale.set(1 + w * 0.5, 1 - w * 0.8, 1 + w * 0.5);
+  }
   if (r.mouth) r.mouth.scale.y = (h.barfUntil > T) ? 1.8 : 1;
   if (r.scarf) r.scarf.rotation.x = Math.sin(T * 12 + h.x) * 0.15 + (moving ? 0.25 : 0);
   if (h.lasering) r.head.rotation.x = Math.sin(T * 40) * 0.03;

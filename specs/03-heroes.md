@@ -10,7 +10,7 @@ All heroes are **chunky, blocky figures** (Roblox build, Brawl Stars attitude): 
 
 | Hero | HP | Speed | Role |
 |---|---|---|---|
-| 🧱 Brickster | 200 (high) | 6 (slow) | Tank |
+| 🧱 Brickster | 200 (high) | 7 (slow) | Tank |
 | ⚡ Zippy | 100 (low) | 10 (fast) | Hit-and-run |
 | 🎯 Boomer | 130 (medium) | 7.5 (medium) | Long range, area damage |
 | 🍃 Barf Bush | 180 (medium-high) ✅ | 9 (fast) | Mid range, sprays groups |
@@ -52,7 +52,7 @@ All heroes are **chunky, blocky figures** (Roblox build, Brawl Stars attitude): 
 
 **Attack: Zap Burst ✅**
 - ✅ Fires 3 quick blue lightning zaps **from his fists**, with slight spread
-- 🔧 12 damage each (36 if all hit) · short range 13 · fires every 0.5 seconds
+- 🔧 12 damage each (36 if all hit) · range 13 · fires every 0.5 seconds
 
 **Super: Dash ✅** (changed from "smash walls")
 - Rockets forward about 14 units in 0.35 seconds, leaving a blue lightning trail
@@ -229,7 +229,8 @@ Bots get a random hero plus a fun name: LavaLlama, NoobMaster, CubeKid, BlockyBo
 
 ## ❤️ Bruno ✅ (the boys' design)
 - **Look ✅:** a red heart with angry eyes, with 🔧 big white boxing gloves and a boxing belt
-- **Attack: Punches ✅:** flying fists from alternating hands · 🔧 20 damage · short range 9 · fast, every 0.4 s
+- **Attack: Punches ✅:** flying fists from alternating hands · 🔧 20 damage · range 13 · fast, every 0.4 s
+  - ✅ 2026-10-12: punches go **farther** (range 9 → 13) (the boys: "make Bruno's attack longer")
   - ✅ 2026-10-04: the fists are **big** cartoon boxing gloves (the boys: "needs to be bigger")
 - **Super: Mega Heart ✅:** throws a massive heart **far and fast** · 🔧 65 damage · range 40 · knocks the target flying
 

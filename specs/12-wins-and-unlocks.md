@@ -7,6 +7,14 @@
 - 🔧 Shown on the menu: "🏆 Wins: 2 · Games: 5"
 - 🔧 Reset for testing: open the game with `?resetwins` on the end of the address (current player only)
 
+## Win streaks 🔥 ✅
+- ✅ A hero with **2 or more wins in a row** shows a flame above their face on the hero cards: 🔥 2, 🔥 3…
+- ✅ Each win with that hero adds 1. A loss with that hero breaks the streak, and the flame disappears.
+- ✅ Each hero has their own streak, so switching heroes keeps the old hero's streak
+- ✅ Saved **per player**: two players using the same hero each have their own streak
+- ✅ **Quitting** a match (or closing the game mid-match) also breaks that hero's streak
+- 🔧 A dropped connection or the host leaving doesn't break it
+
 ## Starter heroes ✅
 🧱 Brickster · ⚡ Zippy · 🎯 Boomer · 🍕 Pizza Pete
 
@@ -63,5 +71,6 @@
 - Details: see 16-map-candy-land.md
 
 ## Changelog
+- 2026-10-12: Win streak flames 🔥 on the hero cards (#12)
 - 2026-10-04: Candy Land world unlocks at 8 wins, plus 8 candy heroes (wins 9–16)
 - 2026-10-03: All 4 unlocked at once at 3 wins → one per win; Barf Bush is now the 8th unlock and Pizza Pete is a starter (the boys' request)

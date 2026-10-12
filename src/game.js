@@ -3316,6 +3316,13 @@ async function login(raw) {
 }
 function nameMsg(text, calm) { const el = $('namemsg'); el.textContent = text || ''; el.classList.toggle('calm', !!calm); }
 if (playerName && new URLSearchParams(location.search).has('resetwins')) { Object.assign(save, newRecord()); storeSave(); }
+// quitting mid-match breaks that hero's streak; save.inMatch marks a match in progress
+function quitStreak(rec, penalty) {
+  if (!rec.inMatch) return;
+  if (penalty && rec.streaks) delete rec.streaks[rec.inMatch];
+  delete rec.inMatch; storeSave();
+}
+for (const rec of Object.values(profiles.players)) quitStreak(rec, true); // tab closed during a match
 const isUnlocked = (k) => save.wins >= (HEROES[k].unlockAt || 0);
 const isRevealed = (k) => save.wins >= (HEROES[k].reveal || 0);
 const REVEAL_MSG = { 4: '🤫 4 SECRET HEROES REVEALED!', 8: '🍬 8 CANDY HEROES REVEALED!' };
@@ -3406,6 +3413,7 @@ function beginMatch(setup) {
   for (const id of ['menu', 'end', 'pause', 'lobby', 'join', 'notice']) $(id).classList.add('hidden');
   $('hud').classList.remove('hidden');
   state = 'play';
+  save.inMatch = player.key; storeSave();
   requestLock();
   goFullscreen();
   checkOrientation();
@@ -3503,6 +3511,7 @@ function endMatch(won, place) {
   save.streaks = save.streaks || {};
   if (won) save.streaks[player.key] = (save.streaks[player.key] || 0) + 1;
   else delete save.streaks[player.key]; // a loss breaks the streak
+  delete save.inMatch;
   storeSave();
   if (ONLINE && save.id) postResult(won ? 1 : place, player.kills, player.key);
   else $('scoremsg').textContent = '';
@@ -3644,7 +3653,7 @@ function buildMenu() {
   $('watchnext').addEventListener('click', () => nextWatch(1));
   $('tomenu').addEventListener('click', showMenu);
   $('resume').addEventListener('click', resume);
-  $('quit').addEventListener('click', showMenu);
+  $('quit').addEventListener('click', () => { quitStreak(save, true); showMenu(); });
   $('switchuser').addEventListener('click', showLogin);
   const go = async () => { if (!(await login($('nameinput').value))) { $('nameinput').focus(); $('nameinput').classList.add('shake'); setTimeout(() => $('nameinput').classList.remove('shake'), 400); } };
   $('nameinput').addEventListener('input', () => nameMsg(''));
@@ -3815,6 +3824,7 @@ function renderLobby() {
   $('lobbywait').textContent = net.host ? (n === 1 ? 'Tell your friends the code! You can also start on your own.' : '') : `Waiting for ${hostName()} to start…`;
 }
 function showNotice(title, text) {
+  quitStreak(save, false); // not your fault (host left, connection dropped)
   showMenu();
   $('menu').classList.add('hidden');
   $('noticetitle').textContent = title; $('noticetext').textContent = text;

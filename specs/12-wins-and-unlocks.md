@@ -12,7 +12,8 @@
 - ✅ Each win with that hero adds 1. A loss with that hero breaks the streak, and the flame disappears.
 - ✅ Each hero has their own streak, so switching heroes keeps the old hero's streak
 - ✅ Saved **per player**: two players using the same hero each have their own streak
-- 🔧 Quitting a match doesn't count as a loss (same as wins and games)
+- ✅ **Quitting** a match (or closing the game mid-match) also breaks that hero's streak
+- 🔧 A dropped connection or the host leaving doesn't break it
 
 ## Starter heroes ✅
 🧱 Brickster · ⚡ Zippy · 🎯 Boomer · 🍕 Pizza Pete
